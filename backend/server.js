@@ -80,6 +80,19 @@ app.post("/auth/login", async (req, res) => {
 app.use("/mines", authenticate);
 app.use("/batches", authenticate);
 
+// 8.5. User info endpoint (add after authentication routes, before protected routes)
+app.get("/user/me", authenticate, async (req, res) => {
+  // req.user.id is set by the authenticate middleware
+  const { data: user, error } = await supabase
+    .from("users")
+    .select("id, username") // select only safe fields
+    .eq("id", req.user.id)
+    .single();
+
+  if (error || !user) return res.status(404).json({ error: "User not found" });
+  res.json(user);
+});
+
 // 9. Mines Endpoints
 app.get("/mines", async (req, res) => {
   const { data, error } = await supabase.from("mines").select("*");
@@ -189,7 +202,6 @@ app.post(
     }
   }
 );
-
 
 // PATCH /batches/:id/assay — upload purity % and assay PDF
 app.patch(
