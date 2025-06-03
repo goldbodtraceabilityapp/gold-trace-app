@@ -42,9 +42,7 @@ function authenticate(req, res, next) {
 app.get("/", (req, res) => {
   res.send("Welcome to the GOLDBOD GOLD TRACEABILITY APP!");
 });
-app.get("/health", (req, res) => {
-  res.json({ status: "OK" });
-});
+
 
 // 7. Authentication Routes
 app.post("/auth/register", async (req, res) => {
@@ -93,28 +91,138 @@ app.get("/user/me", authenticate, async (req, res) => {
   res.json(user);
 });
 
-// 9. Mines Endpoints
-app.get("/mines", async (req, res) => {
-  const { data, error } = await supabase.from("mines").select("*");
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
 
-app.post("/mines", async (req, res) => {
-  const { name, type, location, license_number } = req.body;
+app.get("/batches", async (req, res) => {
+  try {
+    // If your batches table has a "user_id" column, filter by req.user.id.
+    // If not, remove the .eq("user_id", ...) line to return all batches.
+    const { data: batches, error } = await supabase
+      .from("batches")
+      .select("*")
+      .eq("user_id", req.user.id)    // only return batches for this user
+      // .order("date_collected", { ascending: false })  // optional: sort by recent
+      ;
 
-  // Insert and ask Supabase to return the inserted row
-  const { data, error } = await supabase
-    .from("mines")
-    .insert([{ name, type, location, license_number }])
-    .select() // ← add this
-    .single();
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
 
-  if (error) {
-    return res.status(400).json({ error: error.message });
+    res.json(batches);
+  } catch (err) {
+    console.error("GET /batches error:", err);
+    res.status(500).json({ error: "Server error fetching batches." });
   }
-  res.json(data);
 });
+
+// ──────────────────────────────────────────────────────────────────
+// 8.b   (Optional) GET one batch by its ID
+// ──────────────────────────────────────────────────────────────────
+app.get("/batches/:id", async (req, res) => {
+  try {
+    const batchId = req.params.id;
+    // If your table’s primary key is "id" (an auto-generated UUID or integer),
+    // you would do .eq("id", batchId). If your column is named "batch_id", use that.
+    const { data: batch, error } = await supabase
+      .from("batches")
+      .select("*")
+      .eq("id", batchId)           // or .eq("batch_id", batchId) if that’s your PK
+      .single();
+
+    if (error || !batch) {
+      return res.status(404).json({ error: "Batch not found." });
+    }
+    // (Optional) verify that this batch belongs to the authenticated user:
+    if (batch.user_id !== req.user.id) {
+      return res.status(403).json({ error: "Not authorized to view this batch." });
+    }
+
+    res.json(batch);
+  } catch (err) {
+    console.error("GET /batches/:id error:", err);
+    res.status(500).json({ error: "Server error fetching batch." });
+  }
+});
+
+
+// GET /mines (role‐aware)
+app.get("/mines", async (req, res) => {
+  try {
+    // 1. Fetch current user’s role
+    const { data: currentUser, error: userError } = await supabase
+      .from("users")
+      .select("id, role")
+      .eq("id", req.user.id)
+      .single();
+
+    if (userError || !currentUser) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    // 2. Build base query on "mines"
+    let query = supabase
+      .from("mines")
+      .select(`
+        id,
+        name,
+        type,
+        location,
+        license_number,
+        user_id
+      `);
+
+    // 3. If user is NOT goldbod, restrict to their own mines
+    if (currentUser.role !== "goldbod") {
+      query = query.eq("user_id", req.user.id);
+    }
+    // If role === 'goldbod', no filter (admin sees all mines)
+
+    // 4. Execute
+    const { data: mines, error: minesError } = await query;
+    if (minesError) {
+      return res.status(500).json({ error: minesError.message });
+    }
+    res.json(mines);
+  } catch (err) {
+    console.error("GET /mines error:", err);
+    res.status(500).json({ error: "Server error fetching mines." });
+  }
+});
+
+
+// POST /mines (create a new mine, now with user_id)
+app.post("/mines", authenticate, async (req, res) => {
+  try {
+    const { name, type, location, license_number } = req.body;
+
+    if (!name || !type) {
+      return res.status(400).json({ error: "Missing name or type" });
+    }
+
+    // Insert new mine, setting user_id = req.user.id
+    const { data, error } = await supabase
+      .from("mines")
+      .insert([
+        {
+          name,
+          type,
+          location,
+          license_number,
+          user_id: req.user.id,  // <-- must supply a valid user_id
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.json(data);
+  } catch (err) {
+    console.error("POST /mines error:", err);
+    res.status(500).json({ error: "Server error creating mine." });
+  }
+});
+
 
 // POST /batches with file uploads
 app.post(

@@ -6,6 +6,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import RegisterBatchPage from "./pages/RegisterBatchPage";
 import TraceHistoryPage from "./pages/TraceHistoryPage";
+import MinesPage from "./pages/MinesPage"; // ← new import
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -41,6 +42,16 @@ function App() {
         element={
           <ProtectedRoute>
             <TraceHistoryPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Mines List (protected) */}
+      <Route
+        path="/mines"
+        element={
+          <ProtectedRoute>
+            <MinesPage />
           </ProtectedRoute>
         }
       />
