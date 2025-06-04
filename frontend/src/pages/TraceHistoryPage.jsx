@@ -12,18 +12,23 @@ function TraceHistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
+  // Helper to extract numeric part of "BATCH-<number>"
+  const getBatchNumber = (batchId) => {
+    const parts = batchId.split('-');
+    return parts.length === 2 ? parseInt(parts[1], 10) : 0;
+  };
+
   // 1. Fetch both batches and mines when the component mounts
   useEffect(() => {
-    // We’ll load mines first so we can build a lookup map immediately,
-    // then load batches.
-    Promise.all([
-      API.get('/mines'),
-      API.get('/batches')
-    ])
+    Promise.all([API.get('/mines'), API.get('/batches')])
       .then(([minesRes, batchesRes]) => {
+        const sortedBatches = batchesRes.data
+          .slice()
+          .sort((a, b) => getBatchNumber(a.batch_id) - getBatchNumber(b.batch_id));
+
         setMines(minesRes.data);
-        setBatches(batchesRes.data);
-        setFilteredBatches(batchesRes.data);
+        setBatches(sortedBatches);
+        setFilteredBatches(sortedBatches);
         setLoading(false);
       })
       .catch((err) => {
@@ -148,11 +153,12 @@ function TraceHistoryPage() {
                 <tr>
                   <th>Batch ID</th>
                   <th>Mine Name</th>
-                  <th>Date Collected</th>
+                  <th>Date Registered</th>
                   <th>Weight (kg)</th>
                   <th>Purity (%)</th>
                   <th>Origin Cert</th>
                   <th>Dealer License</th>
+                  <th>Assay Report</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -165,8 +171,8 @@ function TraceHistoryPage() {
                         <td>{batch.batch_id}</td>
                         <td>{mineName}</td>
                         <td>
-                          {batch.date_collected
-                            ? new Date(batch.date_collected).toLocaleDateString()
+                          {batch.created_at
+                            ? new Date(batch.created_at).toLocaleString()
                             : '—'}
                         </td>
                         <td>{batch.weight_kg}</td>
@@ -200,6 +206,20 @@ function TraceHistoryPage() {
                           )}
                         </td>
                         <td>
+                          {batch.assay_report_pdf_url ? (
+                            <a
+                              href={batch.assay_report_pdf_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-sm btn-outline-info"
+                            >
+                              View
+                            </a>
+                          ) : (
+                            'N/A'
+                          )}
+                        </td>
+                        <td>
                           <button
                             className="btn btn-sm btn-outline-primary"
                             onClick={() => handleViewTrace(batch)}
@@ -212,7 +232,7 @@ function TraceHistoryPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="8" className="text-center py-4">
+                    <td colSpan="9" className="text-center py-4">
                       No batches found.
                     </td>
                   </tr>

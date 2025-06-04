@@ -6,7 +6,9 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import RegisterBatchPage from "./pages/RegisterBatchPage";
 import TraceHistoryPage from "./pages/TraceHistoryPage";
-import MinesPage from "./pages/MinesPage"; // ← new import
+import TraceDetailsPage from "./pages/TraceDetailsPage";
+import AssayUploadPage from "./pages/AssayUploadPage";
+import MinesPage from "./pages/MinesPage"; 
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -42,6 +44,26 @@ function App() {
         element={
           <ProtectedRoute>
             <TraceHistoryPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Trace Details (protected) */}
+      <Route
+        path="/batch/:id"
+        element={
+          <ProtectedRoute>
+            <TraceDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Assay Upload (protected) */}
+      <Route
+        path="/batch/:id/assay"
+        element={
+          <ProtectedRoute>
+            <AssayUploadPage />
           </ProtectedRoute>
         }
       />
