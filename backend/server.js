@@ -368,6 +368,199 @@ app.patch(
   }
 );
 
+
+
+
+// PATCH /batches/:id/dealer-receive
+app.patch("/batches/:id/dealer-receive", authenticate, async (req, res) => {
+  try {
+    const batchId = req.params.id;
+    const { dealer_location, dealer_received_weight, dealer_receipt_id } = req.body;
+
+    // Basic validation
+    if (!dealer_location || !dealer_received_weight || !dealer_receipt_id) {
+      return res.status(400).json({ 
+        error: "Missing dealer_location, dealer_received_weight, or dealer_receipt_id" 
+      });
+    }
+
+    // Set timestamp to now()
+    const dealer_received_at = new Date().toISOString();
+
+    // Update the batch row
+    const { data, error } = await supabase
+      .from("batches")
+      .update({
+        dealer_received_at,
+        dealer_location,
+        dealer_received_weight: parseFloat(dealer_received_weight),
+        dealer_receipt_id
+      })
+      .eq("id", batchId)
+      .select("*")
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error recording dealer receive step." });
+  }
+});
+
+
+// PATCH /batches/:id/transport
+app.patch("/batches/:id/transport", authenticate, async (req, res) => {
+  try {
+    const batchId = req.params.id;
+    const {
+      transport_courier,
+      transport_tracking_number,
+      transport_origin_location,
+      transport_destination_location
+    } = req.body;
+
+    // Validate required fields
+    if (
+      !transport_courier ||
+      !transport_tracking_number ||
+      !transport_origin_location ||
+      !transport_destination_location
+    ) {
+      return res.status(400).json({
+        error: "Missing transport_courier, transport_tracking_number, transport_origin_location, or transport_destination_location"
+      });
+    }
+
+    // Set timestamp
+    const transport_shipped_at = new Date().toISOString();
+
+    // Update batch row
+    const { data, error } = await supabase
+      .from("batches")
+      .update({
+        transport_shipped_at,
+        transport_courier,
+        transport_tracking_number,
+        transport_origin_location,
+        transport_destination_location
+      })
+      .eq("id", batchId)
+      .select("*")
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error recording transport step." });
+  }
+});
+
+
+// PATCH /batches/:id/goldbod-intake
+app.patch("/batches/:id/goldbod-intake", authenticate, async (req, res) => {
+  try {
+    const batchId = req.params.id;
+    const {
+      goldbod_intake_officer,
+      goldbod_intake_weight,
+      goldbod_intake_receipt_id
+    } = req.body;
+
+    // Validate
+    if (!goldbod_intake_officer || !goldbod_intake_weight || !goldbod_intake_receipt_id) {
+      return res.status(400).json({
+        error: "Missing goldbod_intake_officer, goldbod_intake_weight, or goldbod_intake_receipt_id"
+      });
+    }
+
+    // Set timestamp
+    const goldbod_intake_at = new Date().toISOString();
+
+    // Update batch row
+    const { data, error } = await supabase
+      .from("batches")
+      .update({
+        goldbod_intake_at,
+        goldbod_intake_officer,
+        goldbod_intake_weight: parseFloat(goldbod_intake_weight),
+        goldbod_intake_receipt_id
+      })
+      .eq("id", batchId)
+      .select("*")
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error recording Goldbod intake step." });
+  }
+});
+
+
+
+app.patch(
+  "/batches/:id/assay",
+  authenticate,
+  upload.single("assay_report"),
+  async (req, res) => {
+    try {
+      const batchId = req.params.id;
+      const { purity_percent } = req.body;
+      const file = req.file;
+
+      if (!purity_percent || !file) {
+        return res.status(400).json({ error: "Missing purity_percent or assay_report file" });
+      }
+
+      // Upload PDF to Supabase Storage
+      const pdfPath = `assay-reports/${batchId}-${file.originalname}`;
+      await supabase.storage
+        .from("assay-reports")
+        .upload(pdfPath, file.buffer, { contentType: file.mimetype });
+
+      // Get public URL
+      const { data: pdfData, error: urlError } = supabase.storage
+        .from("assay-reports")
+        .getPublicUrl(pdfPath);
+      if (urlError) throw urlError;
+      const assay_report_pdf_url = pdfData.publicUrl;
+
+      // Update batch row
+      const { data, error } = await supabase
+        .from("batches")
+        .update({
+          purity_percent: parseFloat(purity_percent),
+          assay_report_pdf_url,
+          assay_completed_at: new Date().toISOString()
+        })
+        .eq("id", batchId)
+        .select("*")
+        .single();
+
+      if (error) return res.status(400).json({ error: error.message });
+      res.json(data);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Assay upload or database error" });
+    }
+  }
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
 // 11. Start the server
 const PORT = 5000;
 app.listen(PORT, () => {

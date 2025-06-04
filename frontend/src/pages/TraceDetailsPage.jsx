@@ -18,7 +18,7 @@ function TraceDetailsPage() {
       try {
         const token = localStorage.getItem('token');
 
-        // 1. Fetch the single batch by its primary key (id)
+        // 1) Fetch the single batch by its id
         const { data: batchData, error: batchError } = await API.get(
           `/batches/${encodeURIComponent(id)}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -30,14 +30,14 @@ function TraceDetailsPage() {
         }
         setBatch(batchData);
 
-        // 2. Fetch all mines, then find mine matching batchData.mine_id
+        // 2) Fetch mines list so we can show mine name & location
         const { data: minesData, error: minesError } = await API.get('/mines', {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (minesError) {
           setError(minesError.message || 'Error fetching mine.');
         } else {
-          const found = minesData.find((m) => m.id === batchData.mine_id);
+          const found = minesData.find(m => m.id === batchData.mine_id);
           setMine(found || { name: 'Unknown Mine', location: '' });
         }
       } catch (err) {
@@ -46,7 +46,6 @@ function TraceDetailsPage() {
       }
       setLoading(false);
     }
-
     fetchData();
   }, [id]);
 
@@ -58,39 +57,41 @@ function TraceDetailsPage() {
       </div>
     );
   }
-
   if (error) {
     return <div className="alert alert-danger m-4 text-center">{error}</div>;
   }
 
-  // Helper: format UTC string to local date/time, or show 'Pending'
-  const formatDateTime = (isoString) => {
+  // Helper: format a UTC string or show “Pending”
+  const formatDateTime = isoString => {
     if (!isoString) return 'Pending';
     return new Date(isoString).toLocaleString();
   };
 
-  // Destructure necessary fields from batch
+  // Destructure all the fields we need from batch
   const {
     batch_id,
-    date_collected,               // user‐entered
+    date_collected,               // user‐provided
     weight_kg,
     origin_cert_image_url,
     dealer_license_image_url,
     purity_percent,
     assay_report_pdf_url,
-    created_at,                   // server‐generated timestamp
-    assay_completed_at            // new column
+    created_at,                   // step 1 timestamp
+    dealer_received_at,           // step 2 timestamp
+    dealer_received_weight,       // step 2 weight
+    dealer_receipt_id,            // step 2 receipt
+    dealer_location,              // step 2 location
+    transport_shipped_at,         // step 3 timestamp
+    transport_courier,            // step 3 courier
+    transport_tracking_number,    // step 3 tracking
+    transport_origin_location,    // step 3 origin
+    transport_destination_location, // step 3 destination
+    goldbod_intake_at,            // step 4 timestamp
+    goldbod_intake_officer,       // step 4 officer
+    goldbod_intake_weight,        // step 4 weight
+    goldbod_intake_receipt_id,    // step 4 receipt
+    assay_completed_at            // step 5 timestamp
   } = batch;
-
-  // Dealer license upload should show created_at (same moment)
-  const dealerReceivedAt = dealer_license_image_url
-    ? formatDateTime(created_at)
-    : null;
-
-  // Assay completion uses its own timestamp
-  const assayCompletedAt = assay_completed_at
-    ? formatDateTime(assay_completed_at)
-    : null;
 
   return (
     <div
@@ -142,25 +143,41 @@ function TraceDetailsPage() {
         <div className="card shadow-lg mx-auto" style={{ maxWidth: '720px', borderRadius: '0.75rem' }}>
           <div className="card-body" style={{ background: 'rgba(255,255,255,0.97)' }}>
             <h5 className="card-title" style={{ color: '#b99651', fontWeight: 600 }}>Trace Flow</h5>
-
             <ul className="list-group list-group-flush">
-              {/* 1) Registered by ASM at Mine */}
+
+              {/* 1) Registered by ASM */}
               <li className="list-group-item">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <strong>Batch Registered</strong>
+                    <strong>1. Registered by ASM</strong>
                     <p className="mb-1" style={{ fontSize: '0.9rem', color: '#555' }}>
                       Mine: {mine?.name || '—'}{mine?.location ? ` (${mine.location})` : ''}
                     </p>
                     <p className="mb-0" style={{ fontSize: '0.85rem' }}>
-                      Collected on: {date_collected ? new Date(date_collected).toLocaleDateString() : '—'}
+                      Collected on: <b>{date_collected ? new Date(date_collected).toLocaleDateString() : '—'}</b>
                     </p>
                     <p className="mb-0" style={{ fontSize: '0.85rem' }}>
-                      Weight: {weight_kg} kg
+                      Weight: <b>{weight_kg} kg</b>
+                    </p>
+                    <p className="mb-0" style={{ fontSize: '0.85rem', color: '#777' }}>
+                      Origin Cert:&nbsp;
+                      {origin_cert_image_url 
+                        ? (
+                          <a
+                            href={origin_cert_image_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-sm btn-outline-info"
+                          >
+                            View
+                          </a>
+                        )
+                        : 'N/A'}
                     </p>
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#777' }}>
-                    {formatDateTime(created_at)}
+                    <i>Timestamp:</i><br/>
+                    <b>{formatDateTime(created_at)}</b>
                   </div>
                 </div>
               </li>
@@ -169,47 +186,106 @@ function TraceDetailsPage() {
               <li className="list-group-item">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <strong>Dealer Received</strong>
-                    <p className="mb-1" style={{ fontSize: '0.85rem' }}>
-                      {dealer_license_image_url ? (
-                        <a
-                          href={dealer_license_image_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-sm btn-outline-info"
-                        >
-                          View Dealer License
-                        </a>
-                      ) : (
-                        <span style={{ color: '#999' }}>Pending</span>
-                      )}
+                    <strong>2. Dealer Received</strong>
+                    <p className="mb-1" style={{ fontSize: '0.9rem', color: '#555' }}>
+                      Dealer: <b>{batch.user_id ? `ID ${batch.user_id}` : '—'}</b>
                     </p>
-                    <p className="mb-0" style={{ fontSize: '0.85rem', color: '#555' }}>
-                      Dealer: {batch.user_id ? `ID ${batch.user_id}` : '—'}{/* or replace with dealer name */}
+                    <p className="mb-0" style={{ fontSize: '0.85rem' }}>
+                      Location: <b>{dealer_location || '—'}</b>
+                    </p>
+                    <p className="mb-0" style={{ fontSize: '0.85rem' }}>
+                      Received Weight: <b>{dealer_received_weight && `${dealer_received_weight} kg`}</b>
+                      <span style={{ fontSize: '0.8rem', color: '#777' }}>
+                        {dealer_received_weight
+                          ? ` (Receipt: ${dealer_receipt_id})`
+                          : ''}
+                      </span>
+                    </p>
+                    <p className="mb-0" style={{ fontSize: '0.85rem', color: '#777' }}>
+                      Dealer License:&nbsp;
+                      {dealer_license_image_url
+                        ? (
+                          <a
+                            href={dealer_license_image_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-sm btn-outline-info"
+                          >
+                            View
+                          </a>
+                        )
+                        : 'N/A'}
                     </p>
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#777' }}>
-                    {dealerReceivedAt || '—'}
+                    <i>Timestamp:</i><br/>
+                    <b>{dealer_received_at ? formatDateTime(dealer_received_at) : 'Pending'}</b>
                   </div>
                 </div>
               </li>
 
-              {/* 3) Goldbod Assay Completed */}
+              {/* 3) Transport to Goldbod */}
               <li className="list-group-item">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <strong>Goldbod Assay Completed</strong>
+                    <strong>3. Transport to Goldbod</strong>
+                    <p className="mb-1" style={{ fontSize: '0.9rem', color: '#555' }}>
+                      Courier: <b>{transport_courier || '—'}</b>
+                    </p>
+                    <p className="mb-0" style={{ fontSize: '0.85rem' }}>
+                      Tracking #: <b>{transport_tracking_number || '—'}</b>
+                    </p>
+                    <p className="mb-0" style={{ fontSize: '0.85rem' }}>
+                      From: <b>{transport_origin_location || '—'}</b>  
+                      &nbsp;→&nbsp;
+                      To: <b>{transport_destination_location || '—'}</b>
+                    </p>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#777' }}>
+                    <i>Shipped At:</i><br/>
+                    <b>{transport_shipped_at ? formatDateTime(transport_shipped_at) : 'Pending'}</b>
+                  </div>
+                </div>
+              </li>
+
+              {/* 4) Goldbod Intake & Weighing */}
+              <li className="list-group-item">
+                <div className="d-flex justify-content-between">
+                  <div>
+                    <strong>4. Goldbod Intake & Weighing</strong>
+                    <p className="mb-1" style={{ fontSize: '0.9rem', color: '#555' }}>
+                      Officer: <b>{goldbod_intake_officer || '—'}</b>
+                    </p>
+                    <p className="mb-0" style={{ fontSize: '0.85rem' }}>
+                      Intake Weight: <b>{goldbod_intake_weight ? `${goldbod_intake_weight} kg` : '—'}</b>
+                    </p>
+                    <p className="mb-0" style={{ fontSize: '0.85rem', color: '#777' }}>
+                      Intake Receipt #: <b>{goldbod_intake_receipt_id || '—'}</b>
+                    </p>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#777' }}>
+                    <i>Timestamp:</i><br/>
+                    <b>{goldbod_intake_at ? formatDateTime(goldbod_intake_at) : 'Pending'}</b>
+                  </div>
+                </div>
+              </li>
+
+              {/* 5) Goldbod Assay Completed */}
+              <li className="list-group-item">
+                <div className="d-flex justify-content-between">
+                  <div>
+                    <strong>5. Goldbod Assay Completed</strong>
                     {purity_percent ? (
                       <>
-                        <p className="mb-1" style={{ fontSize: '0.9rem', color: '#555' }}>
-                          Purity: {purity_percent}%
+                        <p style={{ fontSize: '0.9rem', color: '#555', marginBottom: '0.2rem' }}>
+                          Purity: <b>{purity_percent}%</b>
                         </p>
                         {assay_report_pdf_url && (
                           <a
                             href={assay_report_pdf_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="btn btn-sm btn-outline-info mt-1"
+                            className="btn btn-sm btn-outline-info mb-1"
                           >
                             View Assay Report
                           </a>
@@ -230,10 +306,12 @@ function TraceDetailsPage() {
                     )}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#777' }}>
-                    {assayCompletedAt || '—'}
+                    <i>Assay At:</i><br/>
+                    <b>{assay_completed_at ? formatDateTime(assay_completed_at) : 'Pending'}</b>
                   </div>
                 </div>
               </li>
+
             </ul>
           </div>
         </div>
