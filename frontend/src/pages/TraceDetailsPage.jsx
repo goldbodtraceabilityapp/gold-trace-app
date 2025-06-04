@@ -38,7 +38,7 @@ function TraceDetailsPage() {
           setError(minesError.message || 'Error fetching mine.');
         } else {
           const found = minesData.find((m) => m.id === batchData.mine_id);
-          setMine(found || { name: 'Unknown Mine' });
+          setMine(found || { name: 'Unknown Mine', location: '' });
         }
       } catch (err) {
         console.error(err);
@@ -83,7 +83,7 @@ function TraceDetailsPage() {
   } = batch;
 
   // Dealer license upload should show created_at (same moment)
-  const dealerUploadedAt = dealer_license_image_url
+  const dealerReceivedAt = dealer_license_image_url
     ? formatDateTime(created_at)
     : null;
 
@@ -144,13 +144,13 @@ function TraceDetailsPage() {
             <h5 className="card-title" style={{ color: '#b99651', fontWeight: 600 }}>Trace Flow</h5>
 
             <ul className="list-group list-group-flush">
-              {/* 1) Batch Registered */}
+              {/* 1) Registered by ASM at Mine */}
               <li className="list-group-item">
                 <div className="d-flex justify-content-between">
                   <div>
                     <strong>Batch Registered</strong>
                     <p className="mb-1" style={{ fontSize: '0.9rem', color: '#555' }}>
-                      Mine: {mine?.name || '—'}
+                      Mine: {mine?.name || '—'}{mine?.location ? ` (${mine.location})` : ''}
                     </p>
                     <p className="mb-0" style={{ fontSize: '0.85rem' }}>
                       Collected on: {date_collected ? new Date(date_collected).toLocaleDateString() : '—'}
@@ -165,11 +165,11 @@ function TraceDetailsPage() {
                 </div>
               </li>
 
-              {/* 2) Dealer License Uploaded */}
+              {/* 2) Dealer Received Batch */}
               <li className="list-group-item">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <strong>Dealer License Uploaded</strong>
+                    <strong>Dealer Received</strong>
                     <p className="mb-1" style={{ fontSize: '0.85rem' }}>
                       {dealer_license_image_url ? (
                         <a
@@ -178,24 +178,27 @@ function TraceDetailsPage() {
                           rel="noopener noreferrer"
                           className="btn btn-sm btn-outline-info"
                         >
-                          View License
+                          View Dealer License
                         </a>
                       ) : (
                         <span style={{ color: '#999' }}>Pending</span>
                       )}
                     </p>
+                    <p className="mb-0" style={{ fontSize: '0.85rem', color: '#555' }}>
+                      Dealer: {batch.user_id ? `ID ${batch.user_id}` : '—'}{/* or replace with dealer name */}
+                    </p>
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#777' }}>
-                    {dealerUploadedAt || '—'}
+                    {dealerReceivedAt || '—'}
                   </div>
                 </div>
               </li>
 
-              {/* 3) Assay Completed */}
+              {/* 3) Goldbod Assay Completed */}
               <li className="list-group-item">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <strong>Assay Completed</strong>
+                    <strong>Goldbod Assay Completed</strong>
                     {purity_percent ? (
                       <>
                         <p className="mb-1" style={{ fontSize: '0.9rem', color: '#555' }}>
