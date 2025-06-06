@@ -6,7 +6,7 @@ import API from '../services/api';
 function RegisterBatchPage() {
   const navigate = useNavigate();
 
-  const [mines, setMines] = useState([]); 
+  const [mines, setMines] = useState([]);
   const [formData, setFormData] = useState({
     mine_id: '',             // existing mine ID or 'new'
     date_collected: '',
@@ -16,7 +16,6 @@ function RegisterBatchPage() {
   const [newMineName, setNewMineName] = useState('');
 
   const [originCert, setOriginCert] = useState(null);
-  const [dealerLicense, setDealerLicense] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -55,7 +54,6 @@ function RegisterBatchPage() {
   const handleFileChange = (e) => {
     const { name, files } = e.target;
     if (name === 'origin_cert') setOriginCert(files[0]);
-    if (name === 'dealer_license') setDealerLicense(files[0]);
   };
 
   const handleSubmit = async (e) => {
@@ -80,7 +78,7 @@ function RegisterBatchPage() {
           { name: newMineName.trim() },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        selectedMineId = mineResponse.data.id; 
+        selectedMineId = mineResponse.data.id;
         setMines(prev => [...prev, mineResponse.data]);
       }
 
@@ -90,7 +88,6 @@ function RegisterBatchPage() {
       batchData.append('date_collected', formData.date_collected);
       batchData.append('weight_kg', formData.weight_kg);
       if (originCert) batchData.append('origin_cert', originCert);
-      if (dealerLicense) batchData.append('dealer_license', dealerLicense);
 
       // 3. Post the batch
       const batchResponse = await API.post(
@@ -124,11 +121,9 @@ function RegisterBatchPage() {
       setNewMineName('');
       setIsCreatingNew(false);
       setOriginCert(null);
-      setDealerLicense(null);
 
-      // Clear file inputs by ID
+      // Clear file input by ID
       document.getElementById('origin_cert').value = '';
-      document.getElementById('dealer_license').value = '';
     } catch (err) {
       console.error(err);
       const serverMsg = err.response?.data?.error || 'Error registering batch.';
@@ -167,7 +162,7 @@ function RegisterBatchPage() {
               fontWeight: 700,
               width: '100%',
               textAlign: 'center',
-              marginLeft: '12.5rem' // <-- Add this line or increase as needed
+              marginLeft: '12.5rem', // <-- Add this line or increase as needed
             }}
           >
             Register Gold Batch
@@ -181,7 +176,7 @@ function RegisterBatchPage() {
               minWidth: '200px',
               height: '40px',
               alignSelf: 'center',
-              marginTop: '1.5rem'
+              marginTop: '1.5rem',
             }}
             onClick={goBack}
           >
@@ -298,57 +293,6 @@ function RegisterBatchPage() {
                 onChange={handleFileChange}
                 required
               />
-            </div>
-
-            {/* Dealer License Image */}
-            <div className="col-12">
-              <label htmlFor="dealer_license" className="form-label fw-semibold">
-                Dealer License Image
-              </label>
-              <input
-                type="file"
-                id="dealer_license"
-                name="dealer_license"
-                className="form-control"
-                accept="image/*"
-                onChange={handleFileChange}
-                required
-              />
-            </div>
-
-            {/* Purity (%) and Assay Report Info */}
-            <div className="col-12">
-              <label className="form-label fw-semibold">
-                Purity (%) & Assay Report
-              </label>
-              <div
-                className="alert alert-info py-2 mb-2"
-                style={{ fontSize: '0.98rem' }}
-              >
-                <strong>Note:</strong> Purity (%) and the official Assay Report
-                PDF will be provided by <b>Goldbod</b> (formerly PMMC) after your
-                batch is registered. You do not need to upload these now.
-              </div>
-            </div>
-
-            {/* Assay Report PDF (disabled) */}
-            <div className="col-12">
-              <label htmlFor="assay_report_pdf" className="form-label fw-semibold">
-                Assay Report PDF (upload after batch creation)
-              </label>
-              <input
-                type="file"
-                id="assay_report_pdf"
-                name="assay_report_pdf"
-                className="form-control"
-                accept="application/pdf"
-                disabled
-                title="Upload after batch creation"
-              />
-              <div className="form-text">
-                You can upload the assay report and purity % after batch creation,
-                when provided by Goldbod.
-              </div>
             </div>
 
             <div className="col-12 d-flex justify-content-between mt-4">

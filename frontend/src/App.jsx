@@ -1,18 +1,23 @@
 // src/App.jsx
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import RegisterBatchPage from "./pages/RegisterBatchPage";
 import TraceHistoryPage from "./pages/TraceHistoryPage";
 import TraceDetailsPage from "./pages/TraceDetailsPage";
-import AssayUploadPage from "./pages/AssayUploadPage";
-import MinesPage from "./pages/MinesPage"; 
+import MinesPage from "./pages/MinesPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import { useCurrentUser } from "./hooks/useCurrentUser";
 
 function App() {
+  const { user, loading } = useCurrentUser();
+
+  // While we’re fetching “/user/me”, don’t render anything yet
+  if (loading) return <div>Loading…</div>;
+
   return (
     <Routes>
       {/* Public route */}
@@ -28,12 +33,17 @@ function App() {
         }
       />
 
-      {/* Register Batch (protected) */}
+      {/* Register Batch: only ASM users can see/use */}
       <Route
         path="/register-batch"
         element={
           <ProtectedRoute>
-            <RegisterBatchPage />
+            {user?.role === "asm" ? (
+              <RegisterBatchPage />
+            ) : (
+              // If not ASM, redirect to dashboard
+              <Navigate to="/dashboard" replace />
+            )}
           </ProtectedRoute>
         }
       />
@@ -54,16 +64,6 @@ function App() {
         element={
           <ProtectedRoute>
             <TraceDetailsPage />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Assay Upload (protected) */}
-      <Route
-        path="/batch/:id/assay"
-        element={
-          <ProtectedRoute>
-            <AssayUploadPage />
           </ProtectedRoute>
         }
       />

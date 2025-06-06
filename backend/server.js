@@ -70,8 +70,9 @@ app.post("/auth/login", async (req, res) => {
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.status(401).json({ error: "Invalid password" });
 
-  const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-    expiresIn: "8h",
+  // Include role in the JWT payload!
+  const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: "10h",
   });
   res.json({ token });
 });
@@ -218,35 +219,49 @@ app.post(
   authenticate,
   upload.fields([
     { name: "origin_cert", maxCount: 1 },
-    { name: "dealer_license", maxCount: 1 },
+    // dealer_license is now optional, so don't require it
   ]),
   async (req, res) => {
     try {
-      // 1. Read form fields + user ID
-      const user_id = req.user.id;
-      const { mine_id, date_collected, weight_kg } = req.body;
+      const userId = req.user.id;
 
+      // 1️⃣ Fetch this user’s role from “users”:
+      const { data: currentUser, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      if (userError || !currentUser) {
+        return res.status(404).json({ error: "User not found." });
+      }
+
+      // 2️⃣ If role !== "asm", forbid:
+      if (currentUser.role !== "asm") {
+        return res
+          .status(403)
+          .json({ error: "Forbidden: Only ASM users can register batches." });
+      }
+
+      // 3️⃣ Extract form fields + user_id
+      const { mine_id, date_collected, weight_kg } = req.body;
       if (!mine_id || !date_collected || !weight_kg) {
         return res
           .status(400)
           .json({ error: "Missing mine_id, date_collected, or weight_kg" });
       }
 
-      // 2. Ensure files were uploaded
+      // 4️⃣ Ensure origin_cert file was uploaded
       const originFiles = req.files.origin_cert;
-      const licenseFiles = req.files.dealer_license;
       if (!originFiles || originFiles.length === 0) {
         return res.status(400).json({ error: "Missing origin_cert file" });
       }
-      if (!licenseFiles || licenseFiles.length === 0) {
-        return res.status(400).json({ error: "Missing dealer_license file" });
-      }
 
-      // 3. COUNT how many batches this user already has
+      // 5️⃣ Count existing batches for this user to generate batch_id
       const { count: existingCount, error: countError } = await supabase
         .from("batches")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user_id);
+        .eq("user_id", userId);
 
       if (countError) {
         console.error("Error counting existing batches:", countError);
@@ -255,9 +270,9 @@ app.post(
 
       const userBatchCount = existingCount || 0;
       const nextNumber = userBatchCount + 1;
-      const batch_id = `BATCH-${nextNumber}`; // e.g. "BATCH-1", "BATCH-2", etc.
+      const batch_id = `BATCH-${nextNumber}`;
 
-      // 4. Upload origin certificate image to Supabase Storage
+      // 6️⃣ Upload origin certificate image to Supabase Storage
       const originFile = originFiles[0];
       const originPath = `origin-certs/${batch_id}-${originFile.originalname}`;
       await supabase.storage
@@ -271,37 +286,38 @@ app.post(
       if (originUrlError) throw originUrlError;
       const origin_cert_image_url = originData.publicUrl;
 
-      // 5. Upload dealer license image
-      const licenseFile = licenseFiles[0];
-      const licensePath = `dealer-licenses/${batch_id}-${licenseFile.originalname}`;
-      await supabase.storage
-        .from("dealer-licenses")
-        .upload(licensePath, licenseFile.buffer, {
-          contentType: licenseFile.mimetype,
-        });
-      const { data: licenseData, error: licenseUrlError } = supabase.storage
-        .from("dealer-licenses")
-        .getPublicUrl(licensePath);
-      if (licenseUrlError) throw licenseUrlError;
-      const dealer_license_image_url = licenseData.publicUrl;
+      // 7️⃣ Dealer license is now optional
+      let dealer_license_image_url = null;
+      if (req.files.dealer_license && req.files.dealer_license.length > 0) {
+        const licenseFile = req.files.dealer_license[0];
+        const licensePath = `dealer-licenses/${batch_id}-${licenseFile.originalname}`;
+        await supabase.storage
+          .from("dealer-licenses")
+          .upload(licensePath, licenseFile.buffer, {
+            contentType: licenseFile.mimetype,
+          });
+        const { data: licenseData, error: licenseUrlError } = supabase.storage
+          .from("dealer-licenses")
+          .getPublicUrl(licensePath);
+        if (licenseUrlError) throw licenseUrlError;
+        dealer_license_image_url = licenseData.publicUrl;
+      }
 
-      // 6. Insert the new batch row, including user_id and generated batch_id
-      //    We explicitly select "*" so that created_at (and every column) is returned
+      // 8️⃣ Insert the new batch row
       const { data, error } = await supabase
         .from("batches")
         .insert([
           {
-            user_id,
+            user_id: userId,
             batch_id,
             mine_id,
             date_collected,
             weight_kg,
             origin_cert_image_url,
             dealer_license_image_url,
-            // dealer_license_uploaded_at defaults to now() in the DB schema
           },
         ])
-        .select("*")   // <--- ensure created_at (and every column) is returned
+        .select("*")
         .single();
 
       if (error) {
@@ -309,7 +325,7 @@ app.post(
         return res.status(400).json({ error: error.message });
       }
 
-      // 7. Return the newly created batch (including the auto-generated batch_id and created_at)
+      // 9️⃣ Return the newly created batch
       return res.json(data);
     } catch (err) {
       console.error("POST /batches error:", err);
@@ -317,6 +333,7 @@ app.post(
     }
   }
 );
+
 
 // PATCH /batches/:id/assay — upload purity % and assay PDF
 app.patch(
@@ -370,43 +387,69 @@ app.patch(
 
 
 
-
 // PATCH /batches/:id/dealer-receive
-app.patch("/batches/:id/dealer-receive", authenticate, async (req, res) => {
-  try {
-    const batchId = req.params.id;
-    const { dealer_location, dealer_received_weight, dealer_receipt_id } = req.body;
+app.patch(
+  "/batches/:id/dealer-receive",
+  authenticate,
+  upload.single("dealer_license"),
+  async (req, res) => {
+    try {
+      const batchId = req.params.id;
+      const { dealer_location, dealer_received_weight, dealer_receipt_id } = req.body;
+      const file = req.file;
 
-    // Basic validation
-    if (!dealer_location || !dealer_received_weight || !dealer_receipt_id) {
-      return res.status(400).json({ 
-        error: "Missing dealer_location, dealer_received_weight, or dealer_receipt_id" 
-      });
-    }
+      // Basic validation
+      if (!dealer_location || !dealer_received_weight || !dealer_receipt_id) {
+        return res.status(400).json({
+          error: "Missing dealer_location, dealer_received_weight, or dealer_receipt_id"
+        });
+      }
 
-    // Set timestamp to now()
-    const dealer_received_at = new Date().toISOString();
+      // Set timestamp to now()
+      const dealer_received_at = new Date().toISOString();
 
-    // Update the batch row
-    const { data, error } = await supabase
-      .from("batches")
-      .update({
+      // If a file is uploaded, upload to Supabase Storage and get public URL
+      let dealer_license_image_url = undefined;
+      if (file) {
+        const licensePath = `dealer-licenses/${batchId}-${file.originalname}`;
+        await supabase.storage
+          .from("dealer-licenses")
+          .upload(licensePath, file.buffer, {
+            contentType: file.mimetype,
+            upsert: true,
+          });
+        const { data: licenseData, error: licenseUrlError } = supabase.storage
+          .from("dealer-licenses")
+          .getPublicUrl(licensePath);
+        if (licenseUrlError) throw licenseUrlError;
+        dealer_license_image_url = licenseData.publicUrl;
+      }
+
+      // Build update object
+      const updateObj = {
         dealer_received_at,
         dealer_location,
         dealer_received_weight: parseFloat(dealer_received_weight),
-        dealer_receipt_id
-      })
-      .eq("id", batchId)
-      .select("*")
-      .single();
+        dealer_receipt_id,
+      };
+      if (dealer_license_image_url) updateObj.dealer_license_image_url = dealer_license_image_url;
 
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error recording dealer receive step." });
+      // Update the batch row
+      const { data, error } = await supabase
+        .from("batches")
+        .update(updateObj)
+        .eq("id", batchId)
+        .select("*")
+        .single();
+
+      if (error) return res.status(400).json({ error: error.message });
+      res.json(data);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Error recording dealer receive step." });
+    }
   }
-});
+);
 
 
 // PATCH /batches/:id/transport
@@ -548,17 +591,6 @@ app.patch(
     }
   }
 );
-
-
-
-
-
-
-
-
-
-
-
 
 
 // 11. Start the server
