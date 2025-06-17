@@ -181,41 +181,43 @@ function DashboardPage() {
               </div>
             </div>
 
-            {/* ===== Mines List Card ===== */}
-            <div className="col-12 col-md-3">
-              <div
-                className="card h-100"
-                style={{
-                  border: '2px solid #fff',
-                  borderRadius: '0.75rem',
-                  backgroundColor: 'rgba(255,255,255,0.9)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  cursor: 'pointer',
-                }}
-                onClick={goToMines}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
-                }}
-              >
-                <div className="card-body text-center py-5">
-                  <h5 className="card-title mb-3" style={{ color: '#b99651' }}>
-                    View Mines
-                  </h5>
-                  <p className="card-text text-secondary mb-4">
-                    See all mines you manage (or all if you are Goldbod).
-                  </p>
-                  <button className="btn btn-warning px-4" style={{ fontWeight: 500 }}>
-                    Go to Mines
-                  </button>
+            {/* ===== Mines List Card (ASM only) ===== */}
+            {user.role === 'asm' && (
+              <div className="col-12 col-md-3">
+                <div
+                  className="card h-100"
+                  style={{
+                    border: '2px solid #fff',
+                    borderRadius: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    cursor: 'pointer',
+                  }}
+                  onClick={goToMines}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                  }}
+                >
+                  <div className="card-body text-center py-5">
+                    <h5 className="card-title mb-3" style={{ color: '#b99651' }}>
+                      View Mines
+                    </h5>
+                    <p className="card-text text-secondary mb-4">
+                      See all mines you manage (or all if you are Goldbod).
+                    </p>
+                    <button className="btn btn-warning px-4" style={{ fontWeight: 500 }}>
+                      Go to Mines
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <p className="text-white text-center mt-5">Loading your info…</p>

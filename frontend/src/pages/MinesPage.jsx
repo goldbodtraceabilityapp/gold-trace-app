@@ -123,10 +123,7 @@ function MinesPage() {
                 <tr>
                   <th>Name</th>
                   <th>Location</th>
-                  <th>Manager</th>
                   <th>License No.</th>
-                  <th>Registered</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -135,21 +132,7 @@ function MinesPage() {
                     <tr key={mine.id}>
                       <td>{mine.name}</td>
                       <td>{mine.location}</td>
-                      <td>{mine.manager || '—'}</td>
                       <td>{mine.license_number || '—'}</td>
-                      <td>
-                        {mine.created_at
-                          ? new Date(mine.created_at).toLocaleDateString()
-                          : '—'}
-                      </td>
-                      <td>
-                        <button
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => navigate(`/mine/${encodeURIComponent(mine.id)}`)}
-                        >
-                          View Details
-                        </button>
-                      </td>
                     </tr>
                   ))
                 ) : (

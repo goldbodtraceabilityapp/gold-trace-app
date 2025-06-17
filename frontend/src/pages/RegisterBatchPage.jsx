@@ -19,6 +19,11 @@ function RegisterBatchPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  // Add new state for new mine fields
+  const [newMineType, setNewMineType] = useState('');
+  const [newMineLocation, setNewMineLocation] = useState('');
+  const [newMineLicense, setNewMineLicense] = useState('');
+
   // Fetch existing mines for this user
   useEffect(() => {
     API.get('/mines')
@@ -47,8 +52,12 @@ function RegisterBatchPage() {
     });
   };
 
-  const handleNewMineNameChange = (e) => {
-    setNewMineName(e.target.value);
+  const handleNewMineFieldChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'newMineName') setNewMineName(value);
+    if (name === 'newMineType') setNewMineType(value);
+    if (name === 'newMineLocation') setNewMineLocation(value);
+    if (name === 'newMineLicense') setNewMineLicense(value);
   };
 
   const handleFileChange = (e) => {
@@ -68,14 +77,19 @@ function RegisterBatchPage() {
 
       // 1. If user is creating a new mine, call POST /mines first
       if (isCreatingNew) {
-        if (!newMineName.trim()) {
-          setError('Please enter a name for the new mine.');
+        if (!newMineName.trim() || !newMineType.trim() || !newMineLocation.trim() || !newMineLicense.trim()) {
+          setError('Please fill in all new mine fields.');
           return;
         }
-        // Create new mine; assume backend accepts { name }
+        // Create new mine; backend now requires all fields
         const mineResponse = await API.post(
           '/mines',
-          { name: newMineName.trim() },
+          {
+            name: newMineName.trim(),
+            type: newMineType.trim(),
+            location: newMineLocation.trim(),
+            license_number: newMineLicense.trim(),
+          },
           { headers: { Authorization: `Bearer ${token}` } }
         );
         selectedMineId = mineResponse.data.id;
@@ -126,6 +140,9 @@ function RegisterBatchPage() {
         weight_kg: '',
       });
       setNewMineName('');
+      setNewMineType('');
+      setNewMineLocation('');
+      setNewMineLicense('');
       setIsCreatingNew(false);
       setOriginCert(null);
 
@@ -233,23 +250,70 @@ function RegisterBatchPage() {
               </select>
             </div>
 
-            {/* If "Add new mine" is chosen, show text input for the new mine name */}
+            {/* If "Add new mine" is chosen, show inputs for all required new mine fields */}
             {isCreatingNew && (
-              <div className="col-12">
-                <label htmlFor="newMineName" className="form-label fw-semibold">
-                  New Mine Name
-                </label>
-                <input
-                  type="text"
-                  id="newMineName"
-                  name="newMineName"
-                  className="form-control"
-                  placeholder="e.g., Obuasi Main Pit"
-                  value={newMineName}
-                  onChange={handleNewMineNameChange}
-                  required={isCreatingNew}
-                />
-              </div>
+              <>
+                <div className="col-12">
+                  <label htmlFor="newMineName" className="form-label fw-semibold">
+                    New Mine Name
+                  </label>
+                  <input
+                    type="text"
+                    id="newMineName"
+                    name="newMineName"
+                    className="form-control"
+                    placeholder="e.g., Obuasi Main Pit"
+                    value={newMineName}
+                    onChange={handleNewMineFieldChange}
+                    required={isCreatingNew}
+                  />
+                </div>
+                <div className="col-12">
+                  <label htmlFor="newMineType" className="form-label fw-semibold">
+                    New Mine Type
+                  </label>
+                  <input
+                    type="text"
+                    id="newMineType"
+                    name="newMineType"
+                    className="form-control"
+                    placeholder="e.g., ASM, LSM"
+                    value={newMineType}
+                    onChange={handleNewMineFieldChange}
+                    required={isCreatingNew}
+                  />
+                </div>
+                <div className="col-12">
+                  <label htmlFor="newMineLocation" className="form-label fw-semibold">
+                    New Mine Location
+                  </label>
+                  <input
+                    type="text"
+                    id="newMineLocation"
+                    name="newMineLocation"
+                    className="form-control"
+                    placeholder="e.g., Obuasi"
+                    value={newMineLocation}
+                    onChange={handleNewMineFieldChange}
+                    required={isCreatingNew}
+                  />
+                </div>
+                <div className="col-12">
+                  <label htmlFor="newMineLicense" className="form-label fw-semibold">
+                    New Mine License Number
+                  </label>
+                  <input
+                    type="text"
+                    id="newMineLicense"
+                    name="newMineLicense"
+                    className="form-control"
+                    placeholder="e.g., LIC-12345"
+                    value={newMineLicense}
+                    onChange={handleNewMineFieldChange}
+                    required={isCreatingNew}
+                  />
+                </div>
+              </>
             )}
 
             {/* Date Collected */}

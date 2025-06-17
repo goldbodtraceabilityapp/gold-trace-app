@@ -177,15 +177,24 @@ app.get("/mines", async (req, res) => {
   }
 });
 
-// POST /mines (create a new mine, now accepting only { name } if you choose)
+// POST /mines (create a new mine, now requiring name, type, location, license_number)
 app.post("/mines", authenticate, async (req, res) => {
   try {
-    // Pull name, type, location, license_number (type, location, license_number are optional now)
-    const { name, type = null, location = null, license_number = null } = req.body;
+    // Pull all required fields from the request body
+    const { name, type, location, license_number } = req.body;
 
-    // name is required, but type/location/license_number are optional
+    // All fields are now required
     if (!name || name.trim() === "") {
       return res.status(400).json({ error: "Missing name" });
+    }
+    if (!type || type.trim() === "") {
+      return res.status(400).json({ error: "Missing type" });
+    }
+    if (!location || location.trim() === "") {
+      return res.status(400).json({ error: "Missing location" });
+    }
+    if (!license_number || license_number.trim() === "") {
+      return res.status(400).json({ error: "Missing license_number" });
     }
 
     // Insert new mine, setting user_id = req.user.id
@@ -194,9 +203,9 @@ app.post("/mines", authenticate, async (req, res) => {
       .insert([
         {
           name: name.trim(),
-          type,
-          location,
-          license_number,
+          type: type.trim(),
+          location: location.trim(),
+          license_number: license_number.trim(),
           user_id: req.user.id, // associate mine with this user
         },
       ])
