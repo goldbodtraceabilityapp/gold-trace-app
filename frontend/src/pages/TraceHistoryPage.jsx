@@ -171,10 +171,17 @@ function TraceHistoryPage() {
                         <td>{batch.batch_id}</td>
                         <td>{mineName}</td>
                         <td>
-                          {batch.created_at
-                            ? new Date(batch.created_at).toLocaleString()
-                            : '—'}
-                        </td>
+  {batch.created_at
+    ? new Date(batch.created_at).toLocaleString(undefined, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    : '—'}
+</td>
                         <td>{batch.weight_kg}</td>
                         <td>{batch.purity_percent ?? '—'}</td>
                         <td>

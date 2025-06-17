@@ -105,8 +105,28 @@ function TraceDetailsPage() {
   // Helper: format a UTC string or show “Pending”
   const formatDateTime = isoString => {
     if (!isoString) return 'Pending';
-    return new Date(isoString).toLocaleString();
+    return new Date(isoString).toLocaleString(undefined, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
   };
+
+  // Helper: format YMD string to readable date
+  function formatDateYMD(ymd) {
+    if (!ymd) return '—';
+    const [year, month, day] = ymd.split('-');
+    const dateObj = new Date(`${year}-${month}-${day}T12:00:00Z`);
+    return dateObj.toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  }
 
   // Destructure all the fields we need from batch
   const {
@@ -447,7 +467,7 @@ function TraceDetailsPage() {
                     Mine: {mine?.name || '—'}{mine?.location ? ` (${mine.location})` : ''}
                   </p>
                   <p className="mb-0" style={{ fontSize: '0.85rem' }}>
-                    Collected on: <b>{date_collected ? new Date(date_collected).toLocaleDateString() : '—'}</b>
+                    Collected on: <b>{formatDateYMD(date_collected)}</b>
                   </p>
                   <p className="mb-0" style={{ fontSize: '0.85rem' }}>
                     Weight: <b>{weight_kg} kg</b>
