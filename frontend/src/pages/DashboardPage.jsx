@@ -6,15 +6,29 @@ import API from '../services/api';
 function DashboardPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [dealerInvites, setDealerInvites] = useState([]); // NEW
 
-  // Fetch user info on mount
+  // Fetch user info and invitations on mount
   useEffect(() => {
-    API.get('/user/me')
-      .then(res => setUser(res.data))
-      .catch(() => {
+    const fetchUserAndInvites = async () => {
+      try {
+        const userResp = await API.get('/user/me');
+        setUser(userResp.data);
+
+        // If dealer, fetch invitations
+        if (userResp.data.role === 'dealer') {
+          const token = localStorage.getItem('token');
+          const invitesResp = await API.get('/dealer-invitations', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setDealerInvites(invitesResp.data || []);
+        }
+      } catch {
         localStorage.removeItem('token');
         navigate('/');
-      });
+      }
+    };
+    fetchUserAndInvites();
   }, [navigate]);
 
   const handleLogout = () => {
@@ -70,6 +84,21 @@ function DashboardPage() {
             Logout
           </button>
         </div>
+
+        {/* ===== DEALER INVITATIONS ===== */}
+        {user && user.role === 'dealer' && dealerInvites.length > 0 && (
+          <div className="alert alert-info mt-3">
+            <h5>Pending Invitations</h5>
+            <ul>
+              {dealerInvites.map(invite => (
+                <li key={invite.id}>
+                  Batch: <b>{invite.batch_id}</b>
+                  {/* You can add an "Accept" button here if you want */}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* ===== CARDS GRID ===== */}
         {user ? (
@@ -222,6 +251,9 @@ function DashboardPage() {
         ) : (
           <p className="text-white text-center mt-5">Loading your info…</p>
         )}
+
+        {/* ===== USER INFO ===== */}
+        {user && <div style={{color: 'red'}}>Logged in as: {user.username}</div>}
       </div>
     </div>
   );

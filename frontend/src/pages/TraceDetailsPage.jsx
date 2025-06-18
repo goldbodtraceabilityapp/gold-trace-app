@@ -64,11 +64,23 @@ function TraceDetailsPage() {
   const [assayError, setAssayError] = useState('');
   const [assaySuccess, setAssaySuccess] = useState('');
 
+  // Invite Dealer
+  const [showInviteDealer, setShowInviteDealer] = useState(false);
+  const [inviteDealerUsername, setInviteDealerUsername] = useState('');
+  const [inviteDealerMessage, setInviteDealerMessage] = useState('');
+  const [user, setUser] = useState(null); // Add this if you don't already have user info
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
+        // Fetch user info
+        const userResp = await API.get('/user/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUser(userResp.data);
+
         const batchResp = await API.get(`/batches/${encodeURIComponent(id)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -395,6 +407,24 @@ function TraceDetailsPage() {
     }
   };
 
+  // Invite Dealer Handler
+  const handleInviteDealer = async (e) => {
+    e.preventDefault();
+    setInviteDealerMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      await API.post(
+        `/batches/${encodeURIComponent(id)}/invite-dealer`,
+        { dealer_username: inviteDealerUsername.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setInviteDealerMessage('Invitation sent!');
+      setShowInviteDealer(false);
+    } catch (err) {
+      setInviteDealerMessage(err.response?.data?.error || 'Failed to send invite.');
+    }
+  };
+
   // Small helper to render a green circular checkmark
   const CheckCircle = () => (
     <span
@@ -623,79 +653,104 @@ function TraceDetailsPage() {
                       : 'N/A'}
                   </p>
                 </div>
-                {/* Update button and form */}
-                {!dealer_received_at && (
-                  <div className="mt-3">
-                    {!showDealerForm ? (
-                      <button className="btn btn-sm btn-warning" onClick={() => setShowDealerForm(true)}>
-                        Update
-                      </button>
+                {/* Update button, form, and invite logic */}
+                {!dealer_received_at && user && (
+                  <>
+                    {user.role === 'dealer' ? (
+                      <div className="mt-3">
+                        {!showDealerForm ? (
+                          <button className="btn btn-sm btn-warning" onClick={() => setShowDealerForm(true)}>
+                            Update
+                          </button>
+                        ) : (
+                          <form onSubmit={submitDealer} className="row g-2 mt-2">
+                            {dealerError && <div className="alert alert-danger px-2">{dealerError}</div>}
+                            {dealerSuccess && <div className="alert alert-success px-2">{dealerSuccess}</div>}
+                            <div className="col-md-4">
+                              <label htmlFor="dealer_location" className="form-label">Location</label>
+                              <input
+                                type="text"
+                                id="dealer_location"
+                                name="dealer_location"
+                                className="form-control"
+                                value={dealerData.dealer_location}
+                                onChange={handleDealerChange}
+                                placeholder="e.g., Accra"
+                                required
+                              />
+                            </div>
+                            <div className="col-md-4">
+                              <label htmlFor="dealer_received_weight" className="form-label">Received Weight (kg)</label>
+                              <input
+                                type="number"
+                                id="dealer_received_weight"
+                                name="dealer_received_weight"
+                                className="form-control"
+                                value={dealerData.dealer_received_weight}
+                                onChange={handleDealerChange}
+                                placeholder="e.g., 14.80"
+                                step="0.01"
+                                required
+                              />
+                            </div>
+                            <div className="col-md-4">
+                              <label htmlFor="dealer_receipt_id" className="form-label">Receipt #</label>
+                              <input
+                                type="text"
+                                id="dealer_receipt_id"
+                                name="dealer_receipt_id"
+                                className="form-control"
+                                value={dealerData.dealer_receipt_id}
+                                onChange={handleDealerChange}
+                                placeholder="e.g., DEAL-2025-001"
+                                required
+                              />
+                            </div>
+                            <div className="col-md-6">
+                              <label htmlFor="dealer_license" className="form-label">Dealer License (image or PDF)</label>
+                              <input
+                                type="file"
+                                id="dealer_license"
+                                name="dealer_license"
+                                className="form-control"
+                                accept="image/*,application/pdf"
+                                onChange={handleDealerLicenseChange}
+                              />
+                            </div>
+                            <div className="col-12 d-flex justify-content-end gap-2 mt-2">
+                              <button type="button" className="btn btn-outline-secondary" onClick={() => setShowDealerForm(false)}>
+                                Close
+                              </button>
+                              <button type="submit" className="btn btn-success">
+                                Submit Dealer Info
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
                     ) : (
-                      <form onSubmit={submitDealer} className="row g-2 mt-2">
-                        {dealerError && <div className="alert alert-danger px-2">{dealerError}</div>}
-                        {dealerSuccess && <div className="alert alert-success px-2">{dealerSuccess}</div>}
-                        <div className="col-md-4">
-                          <label htmlFor="dealer_location" className="form-label">Location</label>
-                          <input
-                            type="text"
-                            id="dealer_location"
-                            name="dealer_location"
-                            className="form-control"
-                            value={dealerData.dealer_location}
-                            onChange={handleDealerChange}
-                            placeholder="e.g., Accra"
-                            required
-                          />
-                        </div>
-                        <div className="col-md-4">
-                          <label htmlFor="dealer_received_weight" className="form-label">Received Weight (kg)</label>
-                          <input
-                            type="number"
-                            id="dealer_received_weight"
-                            name="dealer_received_weight"
-                            className="form-control"
-                            value={dealerData.dealer_received_weight}
-                            onChange={handleDealerChange}
-                            placeholder="e.g., 14.80"
-                            step="0.01"
-                            required
-                          />
-                        </div>
-                        <div className="col-md-4">
-                          <label htmlFor="dealer_receipt_id" className="form-label">Receipt #</label>
-                          <input
-                            type="text"
-                            id="dealer_receipt_id"
-                            name="dealer_receipt_id"
-                            className="form-control"
-                            value={dealerData.dealer_receipt_id}
-                            onChange={handleDealerChange}
-                            placeholder="e.g., DEAL-2025-001"
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="dealer_license" className="form-label">Dealer License (image or PDF)</label>
-                          <input
-                            type="file"
-                            id="dealer_license"
-                            name="dealer_license"
-                            className="form-control"
-                            accept="image/*,application/pdf"
-                            onChange={handleDealerLicenseChange}
-                          />
-                        </div>
-                        <div className="col-12 d-flex justify-content-end gap-2 mt-2">
-                          <button type="button" className="btn btn-outline-secondary" onClick={() => setShowDealerForm(false)}>
-                            Close
-                          </button>
-                          <button type="submit" className="btn btn-success">
-                            Submit Dealer Info
-                          </button>
-                        </div>
-                      </form>
+                      <div className="mt-2">
+                        <button className="btn btn-outline-primary" onClick={() => setShowInviteDealer(true)}>
+                          Invite Dealer
+                        </button>
+                        {showInviteDealer && (
+                          <form onSubmit={handleInviteDealer} className="mt-2">
+                            <input
+                              type="text"
+                              className="form-control mb-2"
+                              placeholder="Enter dealer's username"
+                              value={inviteDealerUsername}
+                              onChange={e => setInviteDealerUsername(e.target.value)}
+                              required
+                            />
+                            <button type="submit" className="btn btn-success btn-sm">Send Invite</button>
+                            <button type="button" className="btn btn-secondary btn-sm ms-2" onClick={() => setShowInviteDealer(false)}>Cancel</button>
+                          </form>
+                        )}
+                        {inviteDealerMessage && <div className="alert alert-info mt-2">{inviteDealerMessage}</div>}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </li>
 
@@ -725,77 +780,154 @@ function TraceDetailsPage() {
                   </p>
                 </div>
                 {/* Update button and form */}
-                {!transport_shipped_at && (
+                {!transport_shipped_at && user && (
                   <div className="mt-3">
-                    {!showTransportForm ? (
-                      <button className="btn btn-sm btn-warning" onClick={() => setShowTransportForm(true)}>
-                        Update
-                      </button>
-                    ) : (
-                      <form onSubmit={submitTransport} className="row g-2">
-                        {transportError && <div className="alert alert-danger px-2">{transportError}</div>}
-                        {transportSuccess && <div className="alert alert-success px-2">{transportSuccess}</div>}
-                        <div className="col-md-6">
-                          <label htmlFor="transport_courier" className="form-label">Courier</label>
-                          <input
-                            type="text"
-                            id="transport_courier"
-                            name="transport_courier"
-                            className="form-control"
-                            value={transportData.transport_courier}
-                            onChange={handleTransportChange}
-                            placeholder="e.g., DHL"
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="transport_tracking_number" className="form-label">Tracking #</label>
-                          <input
-                            type="text"
-                            id="transport_tracking_number"
-                            name="transport_tracking_number"
-                            className="form-control"
-                            value={transportData.transport_tracking_number}
-                            onChange={handleTransportChange}
-                            placeholder="e.g., GH123456789"
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="transport_origin_location" className="form-label">From</label>
-                          <input
-                            type="text"
-                            id="transport_origin_location"
-                            name="transport_origin_location"
-                            className="form-control"
-                            value={transportData.transport_origin_location}
-                            onChange={handleTransportChange}
-                            placeholder="e.g., Obuasi"
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="transport_destination_location" className="form-label">To</label>
-                          <input
-                            type="text"
-                            id="transport_destination_location"
-                            name="transport_destination_location"
-                            className="form-control"
-                            value={transportData.transport_destination_location}
-                            onChange={handleTransportChange}
-                            placeholder="e.g., Accra"
-                            required
-                          />
-                        </div>
-                        <div className="col-12 d-flex justify-content-end gap-2 mt-2">
-                          <button type="button" className="btn btn-outline-secondary" onClick={() => setShowTransportForm(false)}>
-                            Close
-                          </button>
-                          <button type="submit" className="btn btn-primary">
-                            Submit Transport
-                          </button>
-                        </div>
-                      </form>
+                    {/* ASM can update before dealer step */}
+                    {(!dealer_received_at && user.role === 'asm') && (
+                      !showTransportForm ? (
+                        <button className="btn btn-sm btn-warning" onClick={() => setShowTransportForm(true)}>
+                          Update
+                        </button>
+                      ) : (
+                        <form onSubmit={submitTransport} className="row g-2">
+                          {transportError && <div className="alert alert-danger px-2">{transportError}</div>}
+                          {transportSuccess && <div className="alert alert-success px-2">{transportSuccess}</div>}
+                          <div className="col-md-6">
+                            <label htmlFor="transport_courier" className="form-label">Courier</label>
+                            <input
+                              type="text"
+                              id="transport_courier"
+                              name="transport_courier"
+                              className="form-control"
+                              value={transportData.transport_courier}
+                              onChange={handleTransportChange}
+                              placeholder="e.g., DHL"
+                              required
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label htmlFor="transport_tracking_number" className="form-label">Tracking #</label>
+                            <input
+                              type="text"
+                              id="transport_tracking_number"
+                              name="transport_tracking_number"
+                              className="form-control"
+                              value={transportData.transport_tracking_number}
+                              onChange={handleTransportChange}
+                              placeholder="e.g., GH123456789"
+                              required
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label htmlFor="transport_origin_location" className="form-label">From</label>
+                            <input
+                              type="text"
+                              id="transport_origin_location"
+                              name="transport_origin_location"
+                              className="form-control"
+                              value={transportData.transport_origin_location}
+                              onChange={handleTransportChange}
+                              placeholder="e.g., Obuasi"
+                              required
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label htmlFor="transport_destination_location" className="form-label">To</label>
+                            <input
+                              type="text"
+                              id="transport_destination_location"
+                              name="transport_destination_location"
+                              className="form-control"
+                              value={transportData.transport_destination_location}
+                              onChange={handleTransportChange}
+                              placeholder="e.g., Accra"
+                              required
+                            />
+                          </div>
+                          <div className="col-12 d-flex justify-content-end gap-2 mt-2">
+                            <button type="button" className="btn btn-outline-secondary" onClick={() => setShowTransportForm(false)}>
+                              Close
+                            </button>
+                            <button type="submit" className="btn btn-primary">
+                              Submit Transport
+                            </button>
+                          </div>
+                        </form>
+                      )
+                    )}
+
+                    {/* Dealer can update after dealer step */}
+                    {(dealer_received_at && user.role === 'dealer') && (
+                      !showTransportForm ? (
+                        <button className="btn btn-sm btn-warning" onClick={() => setShowTransportForm(true)}>
+                          Update
+                        </button>
+                      ) : (
+                        <form onSubmit={submitTransport} className="row g-2">
+                          {transportError && <div className="alert alert-danger px-2">{transportError}</div>}
+                          {transportSuccess && <div className="alert alert-success px-2">{transportSuccess}</div>}
+                          <div className="col-md-6">
+                            <label htmlFor="transport_courier" className="form-label">Courier</label>
+                            <input
+                              type="text"
+                              id="transport_courier"
+                              name="transport_courier"
+                              className="form-control"
+                              value={transportData.transport_courier}
+                              onChange={handleTransportChange}
+                              placeholder="e.g., DHL"
+                              required
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label htmlFor="transport_tracking_number" className="form-label">Tracking #</label>
+                            <input
+                              type="text"
+                              id="transport_tracking_number"
+                              name="transport_tracking_number"
+                              className="form-control"
+                              value={transportData.transport_tracking_number}
+                              onChange={handleTransportChange}
+                              placeholder="e.g., GH123456789"
+                              required
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label htmlFor="transport_origin_location" className="form-label">From</label>
+                            <input
+                              type="text"
+                              id="transport_origin_location"
+                              name="transport_origin_location"
+                              className="form-control"
+                              value={transportData.transport_origin_location}
+                              onChange={handleTransportChange}
+                              placeholder="e.g., Obuasi"
+                              required
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label htmlFor="transport_destination_location" className="form-label">To</label>
+                            <input
+                              type="text"
+                              id="transport_destination_location"
+                              name="transport_destination_location"
+                              className="form-control"
+                              value={transportData.transport_destination_location}
+                              onChange={handleTransportChange}
+                              placeholder="e.g., Accra"
+                              required
+                            />
+                          </div>
+                          <div className="col-12 d-flex justify-content-end gap-2 mt-2">
+                            <button type="button" className="btn btn-outline-secondary" onClick={() => setShowTransportForm(false)}>
+                              Close
+                            </button>
+                            <button type="submit" className="btn btn-primary">
+                              Submit Transport
+                            </button>
+                          </div>
+                        </form>
+                      )
                     )}
                   </div>
                 )}

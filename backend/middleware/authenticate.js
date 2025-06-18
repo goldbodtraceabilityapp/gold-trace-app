@@ -13,14 +13,14 @@ module.exports = async function authenticate(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    // Fetch user role from DB
+    // Fetch user id, username, and role from DB
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, role")
+      .select("id, username, role")
       .eq("id", payload.id)
       .single();
     if (error || !user) return res.status(401).json({ error: "Invalid user" });
-    req.user = { id: user.id, role: user.role };
+    req.user = { id: user.id, username: user.username, role: user.role };
     next();
   } catch {
     res.status(401).json({ error: "Invalid token" });

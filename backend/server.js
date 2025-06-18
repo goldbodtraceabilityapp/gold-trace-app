@@ -10,6 +10,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const { createClient } = require("@supabase/supabase-js");
+const authenticate = require('./middleware/authenticate'); // <-- add this line at the top
 
 // 3. Initialize Supabase client (using service role key)
 const supabase = createClient(
@@ -24,21 +25,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// 5. Auth middleware (must come before protected routes)
-function authenticate(req, res, next) {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Missing token" });
-
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: payload.id };
-    next();
-  } catch {
-    res.status(401).json({ error: "Invalid token" });
-  }
-}
 
 // 6. Public Routes
 app.get("/", (req, res) => {
@@ -404,6 +390,29 @@ app.patch(
   async (req, res) => {
     try {
       const batchId = req.params.id;
+
+      // Only dealer can update
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role, username")
+        .eq("id", req.user.id)
+        .single();
+      if (userError || !user || user.role !== "dealer") {
+        return res.status(403).json({ error: "Only dealers can update this step." });
+      }
+
+      // Check invitation exists and is for this dealer
+      const { data: invite, error: inviteError } = await supabase
+        .from("dealer_invitations")
+        .select("*")
+        .eq("batch_id", batchId)
+        .eq("dealer_username", user.username)
+        .single();
+      if (inviteError || !invite) {
+        return res.status(403).json({ error: "No invitation for this dealer." });
+      }
+
+      // --- Your existing update logic below ---
       const { dealer_location, dealer_received_weight, dealer_receipt_id } = req.body;
       const file = req.file;
 
@@ -482,6 +491,46 @@ app.patch("/batches/:id/transport", authenticate, async (req, res) => {
       return res.status(400).json({
         error: "Missing transport_courier, transport_tracking_number, transport_origin_location, or transport_destination_location"
       });
+    }
+
+    // Get batch and dealer_received_at
+    const { data: batch, error: batchError } = await supabase
+      .from("batches")
+      .select("dealer_received_at")
+      .eq("id", batchId)
+      .single();
+    if (batchError || !batch) {
+      return res.status(404).json({ error: "Batch not found." });
+    }
+
+    // Get user role and username
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("role, username")
+      .eq("id", req.user.id)
+      .single();
+    if (userError || !user) {
+      return res.status(403).json({ error: "User not found." });
+    }
+
+    // If dealer_received_at is null, only ASM can update
+    if (!batch.dealer_received_at && user.role !== "asm") {
+      return res.status(403).json({ error: "Only ASM can update transport before dealer step." });
+    }
+    // If dealer_received_at is set, only the invited dealer can update
+    if (batch.dealer_received_at && user.role === "dealer") {
+      // Check invitation exists and is for this dealer
+      const { data: invite, error: inviteError } = await supabase
+        .from("dealer_invitations")
+        .select("*")
+        .eq("batch_id", batchId)
+        .eq("dealer_username", user.username)
+        .single();
+      if (inviteError || !invite) {
+        return res.status(403).json({ error: "No invitation for this dealer." });
+      }
+    } else if (batch.dealer_received_at && user.role !== "dealer") {
+      return res.status(403).json({ error: "Only dealer can update transport after dealer step." });
     }
 
     // Set timestamp
@@ -600,6 +649,77 @@ app.patch(
     }
   }
 );
+
+
+
+// POST /batches/:id/invite-dealer (ASM only)
+app.post("/batches/:id/invite-dealer", authenticate, async (req, res) => {
+  try {
+    const batchId = req.params.id;
+    const { dealer_username } = req.body;
+
+    // Only ASM can invite
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", req.user.id)
+      .single();
+    if (userError || !user || user.role !== "asm") {
+      return res.status(403).json({ error: "Only ASM can invite dealers." });
+    }
+
+    // Check if batch exists and belongs to this ASM
+    const { data: batch, error: batchError } = await supabase
+      .from("batches")
+      .select("user_id")
+      .eq("id", batchId)
+      .single();
+    if (batchError || !batch || batch.user_id !== req.user.id) {
+      return res.status(403).json({ error: "Not authorized for this batch." });
+    }
+
+    // Check if invitation already exists
+    const { data: existingInvite } = await supabase
+      .from("dealer_invitations")
+      .select("*")
+      .eq("batch_id", batchId)
+      .single();
+    if (existingInvite) {
+      return res.status(400).json({ error: "Dealer already invited for this batch." });
+    }
+
+    // Create invitation
+    const { data, error } = await supabase
+      .from("dealer_invitations")
+      .insert([
+        {
+          batch_id: batchId,
+          invited_by: req.user.id,
+          dealer_username,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: "Dealer invited.", invitation: data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error inviting dealer." });
+  }
+});
+
+
+// Example Express route
+app.get('/dealer-invitations', authenticate, async (req, res) => {
+  const { data, error } = await supabase
+    .from('dealer_invitations')
+    .select('*')
+    .eq('dealer_username', req.user.username);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
 
 
 // 11. Start the server
