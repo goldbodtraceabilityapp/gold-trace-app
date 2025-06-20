@@ -1,4 +1,4 @@
-// GOLDBOD GOLD TRACEABILITY APP - Backend Server
+// GOLDBOD GOLD TRACEABILITY APP - Backend SERVER
 
 // 1. Load environment variables
 require("dotenv").config();
@@ -98,21 +98,24 @@ app.get("/batches", async (req, res) => {
 });
 
 // GET /batches/:id (get a single batch by its primary key)
-app.get("/batches/:id", async (req, res) => {
+app.get("/batches/:id", authenticate, async (req, res) => {
   try {
     const batchId = req.params.id;
     const { data: batch, error } = await supabase
       .from("batches")
-      .select("*")
+      .select("*, mines(name)")
       .eq("id", batchId)
       .single();
 
     if (error || !batch) {
       return res.status(404).json({ error: "Batch not found." });
     }
-    if (batch.user_id !== req.user.id) {
+    if (batch.user_id !== req.user.id && req.user.role !== 'dealer') {
       return res.status(403).json({ error: "Not authorized to view this batch." });
     }
+    // Attach mine_name for frontend
+    batch.mine_name = batch.mines?.name || batch.mine_id;
+    delete batch.mines;
     res.json(batch);
   } catch (err) {
     console.error("GET /batches/:id error:", err);
@@ -717,6 +720,18 @@ app.get('/dealer-invitations', authenticate, async (req, res) => {
     .select('*')
     .eq('dealer_username', req.user.username);
   if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+// GET /user/by-id/:id
+app.get('/user/by-id/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, username')
+    .eq('id', id)
+    .single();
+  if (error || !data) return res.status(404).json({ error: 'User not found' });
   res.json(data);
 });
 

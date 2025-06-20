@@ -1,5 +1,6 @@
 // src/pages/DashboardPage.jsx
 import React, { useEffect, useState } from 'react';
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
 
@@ -7,6 +8,9 @@ function DashboardPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [dealerInvites, setDealerInvites] = useState([]); // NEW
+  const [expandedInvite, setExpandedInvite] = useState(null);
+  const [batchDetails, setBatchDetails] = useState({}); // batch_id -> batch info
+  const [asmNames, setAsmNames] = useState({}); // user_id -> username
 
   // Fetch user info and invitations on mount
   useEffect(() => {
@@ -31,6 +35,49 @@ function DashboardPage() {
     fetchUserAndInvites();
   }, [navigate]);
 
+  // Fetch batch and ASM info for each invite
+  useEffect(() => {
+    async function fetchDetails() {
+      if (!dealerInvites.length) return;
+      const token = localStorage.getItem('token');
+      const batchIds = dealerInvites.map(inv => inv.batch_id);
+      const batchRes = await Promise.all(
+        batchIds.map(id =>
+          API.get(`/batches/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(res => res.data)
+            .catch(() => null)
+        )
+      );
+      const batchMap = {};
+      const asmUserIds = [];
+      batchRes.forEach(batch => {
+        if (batch) {
+          batchMap[batch.id] = batch;
+          asmUserIds.push(batch.user_id);
+        }
+      });
+      setBatchDetails(batchMap);
+
+      // Fetch ASM usernames
+      if (asmUserIds.length) {
+        const uniqueIds = [...new Set(asmUserIds)];
+        const usersRes = await Promise.all(
+          uniqueIds.map(uid =>
+            API.get(`/user/by-id/${uid}`, { headers: { Authorization: `Bearer ${token}` } })
+              .then(res => res.data)
+              .catch(() => null)
+          )
+        );
+        const nameMap = {};
+        usersRes.forEach(user => {
+          if (user) nameMap[user.id] = user.username;
+        });
+        setAsmNames(nameMap);
+      }
+    }
+    fetchDetails();
+  }, [dealerInvites]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     navigate('/');
@@ -39,6 +86,16 @@ function DashboardPage() {
   const goToRegister = () => navigate('/register-batch');
   const goToTraceHistory = () => navigate('/trace-history');
   const goToMines = () => navigate('/mines');
+
+  // Accept/Reject handlers
+  const handleAccept = async (inviteId) => {
+    // Implement accept logic (PATCH invitation as accepted)
+    // Optionally, refresh invites after
+  };
+  const handleReject = async (inviteId) => {
+    // Implement reject logic (DELETE invitation or mark as rejected)
+    // Optionally, refresh invites after
+  };
 
   return (
     <div
@@ -89,13 +146,108 @@ function DashboardPage() {
         {user && user.role === 'dealer' && dealerInvites.length > 0 && (
           <div className="alert alert-info mt-3">
             <h5>Pending Invitations</h5>
-            <ul>
-              {dealerInvites.map(invite => (
-                <li key={invite.id}>
-                  Batch: <b>{invite.batch_id}</b>
-                  {/* You can add an "Accept" button here if you want */}
-                </li>
-              ))}
+            <ul className="list-unstyled">
+              {dealerInvites.map(invite => {
+                const batch = batchDetails[invite.batch_id];
+                const asmName = batch && asmNames[batch.user_id];
+                return (
+                  <li key={invite.id} className="mb-2 border-bottom pb-2">
+                    <div
+                      className="d-flex align-items-center justify-content-between"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setExpandedInvite(expandedInvite === invite.id ? null : invite.id)}
+                    >
+                      <span>
+                        <b>From:</b> {asmName ? asmName : 'Loading...'}
+                      </span>
+                      <span>
+                        {expandedInvite === invite.id ? <FaChevronUp /> : <FaChevronDown />}
+                      </span>
+                    </div>
+                    {expandedInvite === invite.id && batch && (
+                      <div className="mt-2">
+                        <table className="table table-bordered table-sm mb-2">
+                          <thead>
+                            <tr>
+                              <th>Batch ID</th>
+                              <th>Mine Name</th>
+                              <th>Date Registered</th>
+                              <th>Weight (kg)</th>
+                              <th>Purity (%)</th>
+                              <th>Origin Cert</th>
+                              <th>Dealer License</th>
+                              <th>Assay Report</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>{batch.batch_id}</td>
+                              <td>{batch.mine_name || batch.mine_id}</td>
+                              <td>
+                                {batch.created_at
+                                  ? new Date(batch.created_at).toLocaleString()
+                                  : '—'}
+                              </td>
+                              <td>{batch.weight_kg}</td>
+                              <td>{batch.purity_percent ?? '—'}</td>
+                              <td>
+                                {batch.origin_cert_image_url ? (
+                                  <a
+                                    href={batch.origin_cert_image_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-sm btn-outline-info"
+                                  >
+                                    View
+                                  </a>
+                                ) : (
+                                  'N/A'
+                                )}
+                              </td>
+                              <td>
+                                {batch.dealer_license_image_url ? (
+                                  <a
+                                    href={batch.dealer_license_image_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-sm btn-outline-info"
+                                  >
+                                    View
+                                  </a>
+                                ) : (
+                                  'N/A'
+                                )}
+                              </td>
+                              <td>
+                                {batch.assay_report_pdf_url ? (
+                                  <a
+                                    href={batch.assay_report_pdf_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-sm btn-outline-info"
+                                  >
+                                    View
+                                  </a>
+                                ) : (
+                                  'N/A'
+                                )}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div className="d-flex gap-2">
+                          <button className="btn btn-success btn-sm" onClick={() => handleAccept(invite.id)}>
+                            Accept
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleReject(invite.id)}>
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
