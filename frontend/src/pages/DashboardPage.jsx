@@ -89,13 +89,24 @@ function DashboardPage() {
 
   // Accept/Reject handlers
   const handleAccept = async (inviteId) => {
-    // Implement accept logic (PATCH invitation as accepted)
-    // Optionally, refresh invites after
+    const token = localStorage.getItem('token');
+    await API.patch(`/dealer-invitations/${inviteId}/accept`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Refresh invites and trace history (batches)
+    const invitesResp = await API.get('/dealer-invitations', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setDealerInvites(invitesResp.data || []);
+    // Optionally, trigger a refresh in Trace History page (if you use context or a global state)
   };
   const handleReject = async (inviteId) => {
     // Implement reject logic (DELETE invitation or mark as rejected)
     // Optionally, refresh invites after
   };
+
+  // Only show invites that are not accepted
+  const pendingInvites = dealerInvites.filter(invite => invite.accepted !== true);
 
   return (
     <div
@@ -143,112 +154,117 @@ function DashboardPage() {
         </div>
 
         {/* ===== DEALER INVITATIONS ===== */}
-        {user && user.role === 'dealer' && dealerInvites.length > 0 && (
+        {user && user.role === 'dealer' && (
           <div className="alert alert-info mt-3">
             <h5>Pending Invitations</h5>
-            <ul className="list-unstyled">
-              {dealerInvites.map(invite => {
-                const batch = batchDetails[invite.batch_id];
-                const asmName = batch && asmNames[batch.user_id];
-                return (
-                  <li key={invite.id} className="mb-2 border-bottom pb-2">
-                    <div
-                      className="d-flex align-items-center justify-content-between"
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => setExpandedInvite(expandedInvite === invite.id ? null : invite.id)}
-                    >
-                      <span>
-                        <b>From:</b> {asmName ? asmName : 'Loading...'}
-                      </span>
-                      <span>
-                        {expandedInvite === invite.id ? <FaChevronUp /> : <FaChevronDown />}
-                      </span>
-                    </div>
-                    {expandedInvite === invite.id && batch && (
-                      <div className="mt-2">
-                        <table className="table table-bordered table-sm mb-2">
-                          <thead>
-                            <tr>
-                              <th>Batch ID</th>
-                              <th>Mine Name</th>
-                              <th>Date Registered</th>
-                              <th>Weight (kg)</th>
-                              <th>Purity (%)</th>
-                              <th>Origin Cert</th>
-                              <th>Dealer License</th>
-                              <th>Assay Report</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              <td>{batch.batch_id}</td>
-                              <td>{batch.mine_name || batch.mine_id}</td>
-                              <td>
-                                {batch.created_at
-                                  ? new Date(batch.created_at).toLocaleString()
-                                  : '—'}
-                              </td>
-                              <td>{batch.weight_kg}</td>
-                              <td>{batch.purity_percent ?? '—'}</td>
-                              <td>
-                                {batch.origin_cert_image_url ? (
-                                  <a
-                                    href={batch.origin_cert_image_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-sm btn-outline-info"
-                                  >
-                                    View
-                                  </a>
-                                ) : (
-                                  'N/A'
-                                )}
-                              </td>
-                              <td>
-                                {batch.dealer_license_image_url ? (
-                                  <a
-                                    href={batch.dealer_license_image_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-sm btn-outline-info"
-                                  >
-                                    View
-                                  </a>
-                                ) : (
-                                  'N/A'
-                                )}
-                              </td>
-                              <td>
-                                {batch.assay_report_pdf_url ? (
-                                  <a
-                                    href={batch.assay_report_pdf_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-sm btn-outline-info"
-                                  >
-                                    View
-                                  </a>
-                                ) : (
-                                  'N/A'
-                                )}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                        <div className="d-flex gap-2">
-                          <button className="btn btn-success btn-sm" onClick={() => handleAccept(invite.id)}>
-                            Accept
-                          </button>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleReject(invite.id)}>
-                            Reject
-                          </button>
-                        </div>
+            {pendingInvites.length === 0 ? (
+              <div className="text-center text-muted py-2">Empty</div>
+            ) : (
+              <ul className="list-unstyled">
+                {pendingInvites.map(invite => {
+                  const batch = batchDetails[invite.batch_id];
+                  const asmName = batch && asmNames[batch.user_id];
+
+                  return (
+                    <li key={invite.id} className="mb-2 border-bottom pb-2">
+                      <div
+                        className="d-flex align-items-center justify-content-between"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setExpandedInvite(expandedInvite === invite.id ? null : invite.id)}
+                      >
+                        <span>
+                          <b>From:</b> {asmName ? asmName : 'Loading...'}
+                        </span>
+                        <span>
+                          {expandedInvite === invite.id ? <FaChevronUp /> : <FaChevronDown />}
+                        </span>
                       </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+                      {expandedInvite === invite.id && batch && (
+                        <div className="mt-2">
+                          <table className="table table-bordered table-sm mb-2">
+                            <thead>
+                              <tr>
+                                <th>Batch ID</th>
+                                <th>Mine Name</th>
+                                <th>Date Registered</th>
+                                <th>Weight (kg)</th>
+                                <th>Purity (%)</th>
+                                <th>Origin Cert</th>
+                                <th>Dealer License</th>
+                                <th>Assay Report</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td>{batch.batch_id}</td>
+                                <td>{batch.mine_name || batch.mine_id}</td>
+                                <td>
+                                  {batch.created_at
+                                    ? new Date(batch.created_at).toLocaleString()
+                                    : '—'}
+                                </td>
+                                <td>{batch.weight_kg}</td>
+                                <td>{batch.purity_percent ?? '—'}</td>
+                                <td>
+                                  {batch.origin_cert_image_url ? (
+                                    <a
+                                      href={batch.origin_cert_image_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="btn btn-sm btn-outline-info"
+                                    >
+                                      View
+                                    </a>
+                                  ) : (
+                                    'N/A'
+                                  )}
+                                </td>
+                                <td>
+                                  {batch.dealer_license_image_url ? (
+                                    <a
+                                      href={batch.dealer_license_image_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="btn btn-sm btn-outline-info"
+                                    >
+                                      View
+                                    </a>
+                                  ) : (
+                                    'N/A'
+                                  )}
+                                </td>
+                                <td>
+                                  {batch.assay_report_pdf_url ? (
+                                    <a
+                                      href={batch.assay_report_pdf_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="btn btn-sm btn-outline-info"
+                                    >
+                                      View
+                                    </a>
+                                  ) : (
+                                    'N/A'
+                                  )}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          <div className="d-flex gap-2">
+                            <button className="btn btn-success btn-sm" onClick={() => handleAccept(invite.id)}>
+                              Accept
+                            </button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleReject(invite.id)}>
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         )}
 

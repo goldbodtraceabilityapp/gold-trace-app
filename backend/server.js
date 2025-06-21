@@ -80,15 +80,35 @@ app.get("/user/me", authenticate, async (req, res) => {
 });
 
 // GET /batches (list all batches for this user)
-app.get("/batches", async (req, res) => {
+app.get("/batches", authenticate, async (req, res) => {
   try {
-    const { data: batches, error } = await supabase
-      .from("batches")
-      .select("*")
-      .eq("user_id", req.user.id); // only return batches for this user
+    let batches = [];
+    if (req.user.role === "dealer") {
+      // Get batches where this dealer has accepted the invite
+      const { data: invites, error: invitesError } = await supabase
+        .from("dealer_invitations")
+        .select("batch_id")
+        .eq("dealer_username", req.user.username)
+        .eq("accepted", true);
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
+      if (invitesError) return res.status(500).json({ error: invitesError.message });
+      const batchIds = invites.map(inv => inv.batch_id);
+
+      if (batchIds.length === 0) return res.json([]);
+      const { data, error } = await supabase
+        .from("batches")
+        .select("*")
+        .in("id", batchIds);
+      if (error) return res.status(500).json({ error: error.message });
+      batches = data;
+    } else {
+      // ASM: show their own batches
+      const { data, error } = await supabase
+        .from("batches")
+        .select("*")
+        .eq("user_id", req.user.id);
+      if (error) return res.status(500).json({ error: error.message });
+      batches = data;
     }
     res.json(batches);
   } catch (err) {
@@ -124,7 +144,7 @@ app.get("/batches/:id", authenticate, async (req, res) => {
 });
 
 // GET /mines (role‐aware: returns only mines the user owns, unless they’re “goldbod”)
-app.get("/mines", async (req, res) => {
+app.get("/mines", authenticate, async (req, res) => {
   try {
     // 1. Fetch current user’s role
     const { data: currentUser, error: userError } = await supabase
@@ -149,10 +169,11 @@ app.get("/mines", async (req, res) => {
         user_id
       `);
 
-    // 3. If user is NOT goldbod, restrict to their own mines
-    if (currentUser.role !== "goldbod") {
+    // 3. If user is ASM, restrict to their own mines
+    if (currentUser.role === "asm") {
       query = query.eq("user_id", req.user.id);
     }
+    // Dealers and goldbod see all mines
 
     // 4. Execute
     const { data: mines, error: minesError } = await query;
@@ -410,9 +431,10 @@ app.patch(
         .select("*")
         .eq("batch_id", batchId)
         .eq("dealer_username", user.username)
+        .eq("accepted", true)
         .single();
       if (inviteError || !invite) {
-        return res.status(403).json({ error: "No invitation for this dealer." });
+        return res.status(403).json({ error: "No accepted invitation for this dealer." });
       }
 
       // --- Your existing update logic below ---
@@ -528,9 +550,10 @@ app.patch("/batches/:id/transport", authenticate, async (req, res) => {
         .select("*")
         .eq("batch_id", batchId)
         .eq("dealer_username", user.username)
+        .eq("accepted", true)
         .single();
       if (inviteError || !invite) {
-        return res.status(403).json({ error: "No invitation for this dealer." });
+        return res.status(403).json({ error: "No accepted invitation for this dealer." });
       }
     } else if (batch.dealer_received_at && user.role !== "dealer") {
       return res.status(403).json({ error: "Only dealer can update transport after dealer step." });
@@ -735,7 +758,27 @@ app.get('/user/by-id/:id', authenticate, async (req, res) => {
   res.json(data);
 });
 
+// PATCH /dealer-invitations/:id/accept
+app.patch('/dealer-invitations/:id/accept', authenticate, async (req, res) => {
+  const { id } = req.params;
+  // Only the invited dealer can accept
+  const { data: invite, error } = await supabase
+    .from('dealer_invitations')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.dealer_username !== req.user.username) return res.status(403).json({ error: 'Not your invite' });
 
+  const { data, error: updateError } = await supabase
+    .from('dealer_invitations')
+    .update({ accepted: true })
+    .eq('id', id)
+    .select()
+    .single();
+  if (updateError) return res.status(400).json({ error: updateError.message });
+  res.json(data);
+});
 
 // 11. Start the server
 const PORT = 5000;
