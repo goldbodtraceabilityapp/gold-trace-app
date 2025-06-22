@@ -69,6 +69,7 @@ function TraceDetailsPage() {
   const [inviteDealerUsername, setInviteDealerUsername] = useState("");
   const [inviteDealerMessage, setInviteDealerMessage] = useState("");
   const [user, setUser] = useState(null); // Add this if you don't already have user info
+  const [dealerInvite, setDealerInvite] = useState(null); // <-- NEW
 
   useEffect(() => {
     async function fetchData() {
@@ -732,6 +733,7 @@ function TraceDetailsPage() {
                     </b>
                   </div>
                 </div>
+
                 <div
                   className="mt-2"
                   style={{ color: "#555", fontSize: "0.9rem" }}
@@ -1412,27 +1414,6 @@ function TraceDetailsPage() {
                                 placeholder="e.g., 98.7"
                                 value={purity}
                                 onChange={(e) => setPurity(e.target.value)}
-                                step="0.01"
-                                min="0"
-                                max="100"
-                                required
-                              />
-                            </div>
-                            <div className="col-md-6">
-                              <label
-                                htmlFor="assay_report"
-                                className="form-label fw-semibold"
-                              >
-                                Assay Report PDF
-                              </label>
-                              <input
-                                type="file"
-                                id="assay_report"
-                                name="assay_report"
-                                className="form-control"
-                                accept="application/pdf"
-                                onChange={handleAssayFileChange}
-                                required
                               />
                             </div>
 

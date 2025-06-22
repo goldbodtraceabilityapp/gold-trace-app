@@ -722,6 +722,7 @@ app.post("/batches/:id/invite-dealer", authenticate, async (req, res) => {
           batch_id: batchId,
           invited_by: req.user.id,
           dealer_username,
+          // accepted: not set, will be NULL
         },
       ])
       .select()
@@ -741,7 +742,8 @@ app.get('/dealer-invitations', authenticate, async (req, res) => {
   const { data, error } = await supabase
     .from('dealer_invitations')
     .select('*')
-    .eq('dealer_username', req.user.username);
+    .eq('dealer_username', req.user.username)
+    .is('accepted', null); // Only pending
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
@@ -778,6 +780,48 @@ app.patch('/dealer-invitations/:id/accept', authenticate, async (req, res) => {
     .single();
   if (updateError) return res.status(400).json({ error: updateError.message });
   res.json(data);
+});
+
+// PATCH /dealer-invitations/:id/reject
+app.patch('/dealer-invitations/:id/reject', authenticate, async (req, res) => {
+  const { id } = req.params;
+  // Only the invited dealer can reject
+  const { data: invite, error } = await supabase
+    .from('dealer_invitations')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.dealer_username !== req.user.username) return res.status(403).json({ error: 'Not your invite' });
+
+  const { data, error: updateError } = await supabase
+    .from('dealer_invitations')
+    .update({ accepted: false })
+    .eq('id', id)
+    .select()
+    .single();
+  if (updateError) return res.status(400).json({ error: updateError.message });
+  res.json(data);
+});
+
+// DELETE /dealer-invitations/:id
+app.delete('/dealer-invitations/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  // Only the invited dealer can delete their invite
+  const { data: invite, error } = await supabase
+    .from('dealer_invitations')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.dealer_username !== req.user.username) return res.status(403).json({ error: 'Not your invite' });
+
+  const { error: deleteError } = await supabase
+    .from('dealer_invitations')
+    .delete()
+    .eq('id', id);
+  if (deleteError) return res.status(400).json({ error: deleteError.message });
+  res.json({ success: true });
 });
 
 // 11. Start the server

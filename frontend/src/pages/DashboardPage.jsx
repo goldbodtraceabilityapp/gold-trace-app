@@ -7,10 +7,12 @@ import API from '../services/api';
 function DashboardPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [dealerInvites, setDealerInvites] = useState([]); // NEW
+  const [dealerInvites, setDealerInvites] = useState([]);
   const [expandedInvite, setExpandedInvite] = useState(null);
-  const [batchDetails, setBatchDetails] = useState({}); // batch_id -> batch info
-  const [asmNames, setAsmNames] = useState({}); // user_id -> username
+  const [batchDetails, setBatchDetails] = useState({});
+  const [asmNames, setAsmNames] = useState({});
+  const [showAcceptedNotification, setShowAcceptedNotification] = useState(false);
+  const [justAcceptedBatchId, setJustAcceptedBatchId] = useState(null);
 
   // Fetch user info and invitations on mount
   useEffect(() => {
@@ -89,24 +91,41 @@ function DashboardPage() {
 
   // Accept/Reject handlers
   const handleAccept = async (inviteId) => {
+    if (!window.confirm("Are you sure you want to accept this invitation?")) return;
     const token = localStorage.getItem('token');
     await API.patch(`/dealer-invitations/${inviteId}/accept`, {}, {
       headers: { Authorization: `Bearer ${token}` }
     });
+    // Find the batch_id for this invite
+    const acceptedInvite = dealerInvites.find(inv => inv.id === inviteId);
+    if (acceptedInvite) {
+      setJustAcceptedBatchId(acceptedInvite.batch_id);
+      setShowAcceptedNotification(true);
+    }
     // Refresh invites and trace history (batches)
     const invitesResp = await API.get('/dealer-invitations', {
       headers: { Authorization: `Bearer ${token}` }
     });
     setDealerInvites(invitesResp.data || []);
-    // Optionally, trigger a refresh in Trace History page (if you use context or a global state)
   };
   const handleReject = async (inviteId) => {
-    // Implement reject logic (DELETE invitation or mark as rejected)
-    // Optionally, refresh invites after
+    if (!window.confirm("Are you sure you want to reject this invitation?")) return;
+    const token = localStorage.getItem('token');
+    // Delete the invite from the backend
+    await API.delete(`/dealer-invitations/${inviteId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Refresh invites
+    const invitesResp = await API.get('/dealer-invitations', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setDealerInvites(invitesResp.data || []);
   };
 
   // Only show invites that are not accepted
-  const pendingInvites = dealerInvites.filter(invite => invite.accepted !== true);
+  const pendingInvites = dealerInvites.filter(invite => invite.accepted == null);
+  const acceptedInvites = dealerInvites.filter(invite => invite.accepted === true);
+  const rejectedInvites = dealerInvites.filter(invite => invite.accepted === false);
 
   return (
     <div
@@ -152,6 +171,32 @@ function DashboardPage() {
             Logout
           </button>
         </div>
+
+        {/* ===== DEALER ACCEPTED NOTIFICATION ===== */}
+        {showAcceptedNotification && justAcceptedBatchId && (
+          <div className="alert alert-success alert-dismissible fade show d-flex align-items-center justify-content-between" role="alert">
+            <div>
+              <b>Batch accepted!</b> The batch has been added to your trace history.
+            </div>
+            <div>
+              <button
+                className="btn btn-sm btn-outline-primary ms-2"
+                onClick={() => {
+                  setShowAcceptedNotification(false);
+                  navigate(`/batch/${encodeURIComponent(justAcceptedBatchId)}`);
+                }}
+              >
+                View Trace Flow
+              </button>
+              <button
+                type="button"
+                className="btn-close ms-2"
+                aria-label="Close"
+                onClick={() => setShowAcceptedNotification(false)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* ===== DEALER INVITATIONS ===== */}
         {user && user.role === 'dealer' && (
