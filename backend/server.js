@@ -736,6 +736,59 @@ app.post("/batches/:id/invite-dealer", authenticate, async (req, res) => {
   }
 });
 
+// POST /batches/:id/invite-goldbod (Dealer only)
+app.post("/batches/:id/invite-goldbod", authenticate, async (req, res) => {
+  const batchId = req.params.id;
+  const { goldbod_username } = req.body;
+
+  // Only dealer can invite
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("role, username")
+    .eq("id", req.user.id)
+    .single();
+  if (userError || !user || user.role !== "dealer") {
+    return res.status(403).json({ error: "Only dealers can invite goldbod." });
+  }
+
+  // Check if batch exists and dealer is assigned
+  const { data: batch, error: batchError } = await supabase
+    .from("batches")
+    .select("*")
+    .eq("id", batchId)
+    .single();
+  if (batchError || !batch) {
+    return res.status(404).json({ error: "Batch not found." });
+  }
+
+  // Check if invitation already exists
+  const { data: existingInvite } = await supabase
+    .from("goldbod_invitations")
+    .select("*")
+    .eq("batch_id", batchId)
+    .single();
+  if (existingInvite) {
+    return res.status(400).json({ error: "Goldbod already invited for this batch." });
+  }
+
+  // Create invitation
+  const { data, error } = await supabase
+    .from("goldbod_invitations")
+    .insert([
+      {
+        batch_id: batchId,
+        invited_by: req.user.id,
+        goldbod_username,
+        // accepted: null (pending)
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ message: "Goldbod invited.", invitation: data });
+});
+
 
 // Example Express route
 app.get('/dealer-invitations', authenticate, async (req, res) => {
@@ -822,6 +875,61 @@ app.delete('/dealer-invitations/:id', authenticate, async (req, res) => {
     .eq('id', id);
   if (deleteError) return res.status(400).json({ error: deleteError.message });
   res.json({ success: true });
+});
+
+// GET /goldbod-invitations
+app.get("/goldbod-invitations", authenticate, async (req, res) => {
+  if (req.user.role !== "goldbod") {
+    return res.status(403).json({ error: "Only goldbod can view these invites." });
+  }
+  const { data, error } = await supabase
+    .from("goldbod_invitations")
+    .select("*")
+    .eq("goldbod_username", req.user.username);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+app.patch("/goldbod-invitations/:id/accept", authenticate, async (req, res) => {
+  const { id } = req.params;
+  // Only the invited goldbod can accept
+  const { data: invite, error } = await supabase
+    .from("goldbod_invitations")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !invite) return res.status(404).json({ error: "Invite not found" });
+  if (invite.goldbod_username !== req.user.username) return res.status(403).json({ error: "Not your invite" });
+
+  const { data, error: updateError } = await supabase
+    .from("goldbod_invitations")
+    .update({ accepted: true })
+    .eq("id", id)
+    .select()
+    .single();
+  if (updateError) return res.status(400).json({ error: updateError.message });
+  res.json(data);
+});
+
+app.patch("/goldbod-invitations/:id/reject", authenticate, async (req, res) => {
+  const { id } = req.params;
+  // Only the invited goldbod can reject
+  const { data: invite, error } = await supabase
+    .from("goldbod_invitations")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !invite) return res.status(404).json({ error: "Invite not found" });
+  if (invite.goldbod_username !== req.user.username) return res.status(403).json({ error: "Not your invite" });
+
+  const { data, error: updateError } = await supabase
+    .from("goldbod_invitations")
+    .update({ accepted: false })
+    .eq("id", id)
+    .select()
+    .single();
+  if (updateError) return res.status(400).json({ error: updateError.message });
+  res.json(data);
 });
 
 // 11. Start the server

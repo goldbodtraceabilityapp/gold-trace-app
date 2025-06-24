@@ -8,9 +8,11 @@ function DashboardPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [dealerInvites, setDealerInvites] = useState([]);
+  const [goldbodInvites, setGoldbodInvites] = useState([]);
   const [expandedInvite, setExpandedInvite] = useState(null);
   const [batchDetails, setBatchDetails] = useState({});
   const [asmNames, setAsmNames] = useState({});
+  const [dealerNames, setDealerNames] = useState({});
   const [showAcceptedNotification, setShowAcceptedNotification] = useState(false);
   const [justAcceptedBatchId, setJustAcceptedBatchId] = useState(null);
 
@@ -36,6 +38,20 @@ function DashboardPage() {
     };
     fetchUserAndInvites();
   }, [navigate]);
+
+  // Fetch goldbod invites if role is goldbod
+  useEffect(() => {
+    if (user?.role === "goldbod") {
+      const fetchInvites = async () => {
+        const token = localStorage.getItem("token");
+        const resp = await API.get("/goldbod-invitations", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setGoldbodInvites(resp.data || []);
+      };
+      fetchInvites();
+    }
+  }, [user]);
 
   // Fetch batch and ASM info for each invite
   useEffect(() => {
@@ -80,6 +96,49 @@ function DashboardPage() {
     fetchDetails();
   }, [dealerInvites]);
 
+  // Fetch batch and dealer info for each goldbod invite
+  useEffect(() => {
+    async function fetchGoldbodDetails() {
+      if (!goldbodInvites.length) return;
+      const token = localStorage.getItem('token');
+      const batchIds = goldbodInvites.map(inv => inv.batch_id);
+      const batchRes = await Promise.all(
+        batchIds.map(id =>
+          API.get(`/batches/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(res => res.data)
+            .catch(() => null)
+        )
+      );
+      const batchMap = {};
+      const dealerUsernames = [];
+      batchRes.forEach(batch => {
+        if (batch) {
+          batchMap[batch.id] = batch;
+          if (batch.dealer_username) dealerUsernames.push(batch.dealer_username);
+        }
+      });
+      setBatchDetails(prev => ({ ...prev, ...batchMap }));
+
+      // Fetch dealer usernames (if not already in batch)
+      if (dealerUsernames.length) {
+        const uniqueNames = [...new Set(dealerUsernames)];
+        const usersRes = await Promise.all(
+          uniqueNames.map(username =>
+            API.get(`/user/by-username/${username}`, { headers: { Authorization: `Bearer ${token}` } })
+              .then(res => res.data)
+              .catch(() => null)
+          )
+        );
+        const nameMap = {};
+        usersRes.forEach(user => {
+          if (user) nameMap[user.username] = user.username;
+        });
+        setDealerNames(nameMap);
+      }
+    }
+    fetchGoldbodDetails();
+  }, [goldbodInvites]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     navigate('/');
@@ -120,6 +179,27 @@ function DashboardPage() {
       headers: { Authorization: `Bearer ${token}` }
     });
     setDealerInvites(invitesResp.data || []);
+  };
+  const handleAcceptGoldbodInvite = async (inviteId, batchId) => {
+    if (!window.confirm("Accept this invitation?")) return;
+    const token = localStorage.getItem("token");
+    await API.patch(`/goldbod-invitations/${inviteId}/accept`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Optionally, navigate to intake/log page for this batch
+    navigate(`/batch/${batchId}`);
+  };
+  const handleRejectGoldbodInvite = async (inviteId) => {
+    if (!window.confirm("Reject this invitation?")) return;
+    const token = localStorage.getItem("token");
+    await API.patch(`/goldbod-invitations/${inviteId}/reject`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Refresh invites
+    const resp = await API.get("/goldbod-invitations", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setGoldbodInvites(resp.data || []);
   };
 
   // Only show invites that are not accepted
@@ -308,6 +388,133 @@ function DashboardPage() {
                     </li>
                   );
                 })}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* ===== GOLD BOD INVITATIONS ===== */}
+        {user?.role === "goldbod" && (
+          <div className="alert alert-info mt-3">
+            <h5>Pending Goldbod Invitations</h5>
+            {goldbodInvites.filter(invite => invite.accepted == null).length === 0 ? (
+              <div className="text-center text-muted py-2">Empty</div>
+            ) : (
+              <ul className="list-unstyled">
+                {goldbodInvites
+                  .filter(invite => invite.accepted == null)
+                  .map(invite => {
+                    const batch = batchDetails[invite.batch_id];
+                    // Try to get dealer username from batch or invite
+                    const dealerName =
+                      (batch && batch.dealer_username) ||
+                      dealerNames[invite.dealer_username] ||
+                      invite.dealer_username ||
+                      "Unknown Dealer";
+                    return (
+                      <li key={invite.id} className="mb-2 border-bottom pb-2">
+                        <div
+                          className="d-flex align-items-center justify-content-between"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setExpandedInvite(expandedInvite === invite.id ? null : invite.id)}
+                        >
+                          <span>
+                            <b>From:</b> {dealerName}
+                          </span>
+                          <span>
+                            {expandedInvite === invite.id ? <FaChevronUp /> : <FaChevronDown />}
+                          </span>
+                        </div>
+                        {expandedInvite === invite.id && batch && (
+                          <div className="mt-2">
+                            <table className="table table-bordered table-sm mb-2">
+                              <thead>
+                                <tr>
+                                  <th>Batch ID</th>
+                                  <th>Mine Name</th>
+                                  <th>Date Registered</th>
+                                  <th>Weight (kg)</th>
+                                  <th>Purity (%)</th>
+                                  <th>Origin Cert</th>
+                                  <th>Dealer License</th>
+                                  <th>Assay Report</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td>{batch.batch_id}</td>
+                                  <td>{batch.mine_name || batch.mine_id}</td>
+                                  <td>
+                                    {batch.created_at
+                                      ? new Date(batch.created_at).toLocaleString()
+                                      : '—'}
+                                  </td>
+                                  <td>{batch.weight_kg}</td>
+                                  <td>{batch.purity_percent ?? '—'}</td>
+                                  <td>
+                                    {batch.origin_cert_image_url ? (
+                                      <a
+                                        href={batch.origin_cert_image_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn btn-sm btn-outline-info"
+                                      >
+                                        View
+                                      </a>
+                                    ) : (
+                                      'N/A'
+                                    )}
+                                  </td>
+                                  <td>
+                                    {batch.dealer_license_image_url ? (
+                                      <a
+                                        href={batch.dealer_license_image_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn btn-sm btn-outline-info"
+                                      >
+                                        View
+                                      </a>
+                                    ) : (
+                                      'N/A'
+                                    )}
+                                  </td>
+                                  <td>
+                                    {batch.assay_report_pdf_url ? (
+                                      <a
+                                        href={batch.assay_report_pdf_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn btn-sm btn-outline-info"
+                                      >
+                                        View
+                                      </a>
+                                    ) : (
+                                      'N/A'
+                                    )}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <div className="d-flex gap-2">
+                              <button
+                                className="btn btn-success btn-sm"
+                                onClick={() => handleAcceptGoldbodInvite(invite.id, invite.batch_id)}
+                              >
+                                Accept
+                              </button>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={() => handleRejectGoldbodInvite(invite.id)}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
               </ul>
             )}
           </div>

@@ -71,6 +71,11 @@ function TraceDetailsPage() {
   const [user, setUser] = useState(null); // Add this if you don't already have user info
   const [dealerInvite, setDealerInvite] = useState(null); // <-- NEW
 
+  // Invite Goldbod
+  const [showInviteGoldbod, setShowInviteGoldbod] = useState(false);
+  const [inviteGoldbodUsername, setInviteGoldbodUsername] = useState("");
+  const [inviteGoldbodMessage, setInviteGoldbodMessage] = useState("");
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -447,6 +452,26 @@ function TraceDetailsPage() {
       setShowInviteDealer(false);
     } catch (err) {
       setInviteDealerMessage(
+        err.response?.data?.error || "Failed to send invite."
+      );
+    }
+  };
+
+  // Invite Goldbod Handler
+  const handleInviteGoldbod = async (e) => {
+    e.preventDefault();
+    setInviteGoldbodMessage("");
+    try {
+      const token = localStorage.getItem("token");
+      await API.post(
+        `/batches/${encodeURIComponent(id)}/invite-goldbod`,
+        { goldbod_username: inviteGoldbodUsername.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setInviteGoldbodMessage("Invitation sent!");
+      setShowInviteGoldbod(false);
+    } catch (err) {
+      setInviteGoldbodMessage(
         err.response?.data?.error || "Failed to send invite."
       );
     }
@@ -1198,6 +1223,12 @@ function TraceDetailsPage() {
                 )}
               </li>
 
+
+            
+
+
+
+
               {/* 4) Goldbod Intake & Weighing */}
               <li className="list-group-item">
                 <div className="d-flex justify-content-between">
@@ -1334,7 +1365,61 @@ function TraceDetailsPage() {
                     )}
                   </div>
                 )}
+
+
+                {/* Dealer can invite Goldbod after intake is still pending */}
+{!goldbod_intake_at && transport_shipped_at && user?.role === "dealer" && (
+  <div className="mt-3">
+    <button
+      className="btn btn-outline-primary"
+      onClick={() => setShowInviteGoldbod(true)}
+    >
+      Invite Goldbod
+    </button>
+    {showInviteGoldbod && (
+      <form onSubmit={handleInviteGoldbod} className="mt-2">
+        <input
+          type="text"
+          className="form-control mb-2"
+          placeholder="Enter goldbod's username"
+          value={inviteGoldbodUsername}
+          onChange={e => setInviteGoldbodUsername(e.target.value)}
+          required
+        />
+        <button type="submit" className="btn btn-success btn-sm">
+          Send Invite
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm ms-2"
+          onClick={() => setShowInviteGoldbod(false)}
+        >
+          Cancel
+        </button>
+      </form>
+    )}
+    {inviteGoldbodMessage && (
+      <div className="alert alert-info mt-2">{inviteGoldbodMessage}</div>
+    )}
+  </div>
+)}
+
+
+
+
+
               </li>
+
+
+
+               
+
+
+
+
+
+
+
 
               {/* 5) Goldbod Assay Completed */}
               <li className="list-group-item">
