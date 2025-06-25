@@ -1397,8 +1397,8 @@ function TraceDetailsPage() {
                 )}
 
 
-                {/* Dealer can invite Goldbod after intake is still pending */}
-                {!goldbod_intake_at && transport_shipped_at && user?.role === "dealer" && (
+                {/* ASM or Dealer can invite Goldbod after transport, if intake is still pending */}
+                {!goldbod_intake_at && transport_shipped_at && (user?.role === "dealer" || user?.role === "asm") && (
                   <div className="mt-3">
                     <button
                       className="btn btn-outline-primary"

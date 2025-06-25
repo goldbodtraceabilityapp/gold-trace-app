@@ -740,19 +740,19 @@ app.post("/batches/:id/invite-dealer", authenticate, async (req, res) => {
   }
 });
 
-// POST /batches/:id/invite-goldbod (Dealer only)
+// POST /batches/:id/invite-goldbod (Dealer or ASM)
 app.post("/batches/:id/invite-goldbod", authenticate, async (req, res) => {
   const batchId = req.params.id;
   const { goldbod_username } = req.body;
 
-  // Only dealer can invite
+  // Allow dealer or asm to invite
   const { data: user, error: userError } = await supabase
     .from("users")
     .select("role, username")
     .eq("id", req.user.id)
     .single();
-  if (userError || !user || user.role !== "dealer") {
-    return res.status(403).json({ error: "Only dealers can invite goldbod." });
+  if (userError || !user || (user.role !== "dealer" && user.role !== "asm")) {
+    return res.status(403).json({ error: "Only dealers or ASM can invite goldbod." });
   }
 
   // Check if batch exists and dealer is assigned

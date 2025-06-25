@@ -18,6 +18,7 @@ function RegisterBatchPage() {
   const [originCert, setOriginCert] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // Add new state for new mine fields
   const [newMineType, setNewMineType] = useState('');
@@ -69,6 +70,7 @@ function RegisterBatchPage() {
     e.preventDefault();
     setMessage('');
     setError('');
+    setSubmitting(true);
 
     try {
       const token = localStorage.getItem('token');
@@ -79,6 +81,7 @@ function RegisterBatchPage() {
       if (isCreatingNew) {
         if (!newMineName.trim() || !newMineType.trim() || !newMineLocation.trim() || !newMineLicense.trim()) {
           setError('Please fill in all new mine fields.');
+          setSubmitting(false);
           return;
         }
         // Create new mine; backend now requires all fields
@@ -154,6 +157,8 @@ function RegisterBatchPage() {
       setError(serverMsg);
       // Also scroll to top if there's an error
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -371,6 +376,7 @@ function RegisterBatchPage() {
                 type="button"
                 className="btn btn-outline-secondary"
                 onClick={goBack}
+                disabled={submitting}
               >
                 Back to Dashboard
               </button>
@@ -378,11 +384,35 @@ function RegisterBatchPage() {
                 type="submit"
                 className="btn btn-warning px-4"
                 style={{ fontWeight: 600 }}
+                disabled={submitting}
               >
                 Submit Batch
               </button>
             </div>
           </form>
+
+          {/* Loading overlay */}
+          {submitting && (
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100vw",
+                height: "100vh",
+                background: "rgba(255,255,255,0.7)",
+                zIndex: 9999,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div className="text-center">
+                <div className="spinner-border text-warning mb-3" role="status" />
+                <div style={{ fontSize: "1.3rem", color: "#b99651" }}>Loading…</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
