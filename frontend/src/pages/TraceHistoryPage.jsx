@@ -167,21 +167,29 @@ function TraceHistoryPage() {
                   filteredBatches.map((batch) => {
                     const mineName = mineById[batch.mine_id] || 'Unknown Mine';
                     return (
-                      <tr key={batch.id}>
+                      <tr
+                        key={batch.id}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleViewTrace(batch)}
+                        tabIndex={0}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') handleViewTrace(batch);
+                        }}
+                      >
                         <td>{batch.batch_id}</td>
                         <td>{mineName}</td>
                         <td>
-  {batch.created_at
-    ? new Date(batch.created_at).toLocaleString(undefined, {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      })
-    : '—'}
-</td>
+                          {batch.created_at
+                            ? new Date(batch.created_at).toLocaleString(undefined, {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                              })
+                            : '—'}
+                        </td>
                         <td>{batch.weight_kg}</td>
                         <td>{batch.purity_percent ?? '—'}</td>
                         <td>
@@ -191,6 +199,7 @@ function TraceHistoryPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-sm btn-outline-info"
+                              onClick={e => e.stopPropagation()}
                             >
                               View
                             </a>
@@ -205,6 +214,7 @@ function TraceHistoryPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-sm btn-outline-info"
+                              onClick={e => e.stopPropagation()}
                             >
                               View
                             </a>
@@ -219,6 +229,7 @@ function TraceHistoryPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-sm btn-outline-info"
+                              onClick={e => e.stopPropagation()}
                             >
                               View
                             </a>
@@ -229,7 +240,10 @@ function TraceHistoryPage() {
                         <td>
                           <button
                             className="btn btn-sm btn-outline-primary"
-                            onClick={() => handleViewTrace(batch)}
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleViewTrace(batch);
+                            }}
                           >
                             View Trace
                           </button>

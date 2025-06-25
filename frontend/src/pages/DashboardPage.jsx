@@ -13,8 +13,11 @@ function DashboardPage() {
   const [batchDetails, setBatchDetails] = useState({});
   const [asmNames, setAsmNames] = useState({});
   const [dealerNames, setDealerNames] = useState({});
+  const [dealerNamesLoading, setDealerNamesLoading] = useState(true);
   const [showAcceptedNotification, setShowAcceptedNotification] = useState(false);
   const [justAcceptedBatchId, setJustAcceptedBatchId] = useState(null);
+  const [showGoldbodAcceptedNotification, setShowGoldbodAcceptedNotification] = useState(false);
+  const [justAcceptedGoldbodBatchId, setJustAcceptedGoldbodBatchId] = useState(null);
 
   // Fetch user info and invitations on mount
   useEffect(() => {
@@ -99,9 +102,12 @@ function DashboardPage() {
   // Fetch batch and dealer info for each goldbod invite
   useEffect(() => {
     async function fetchGoldbodDetails() {
+      setDealerNamesLoading(true);
       if (!goldbodInvites.length) return;
       const token = localStorage.getItem('token');
       const batchIds = goldbodInvites.map(inv => inv.batch_id);
+
+      // Fetch batch details for all goldbod invites
       const batchRes = await Promise.all(
         batchIds.map(id =>
           API.get(`/batches/${id}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -110,31 +116,82 @@ function DashboardPage() {
         )
       );
       const batchMap = {};
-      const dealerUsernames = [];
       batchRes.forEach(batch => {
         if (batch) {
           batchMap[batch.id] = batch;
-          if (batch.dealer_username) dealerUsernames.push(batch.dealer_username);
         }
       });
       setBatchDetails(prev => ({ ...prev, ...batchMap }));
 
-      // Fetch dealer usernames (if not already in batch)
-      if (dealerUsernames.length) {
-        const uniqueNames = [...new Set(dealerUsernames)];
-        const usersRes = await Promise.all(
-          uniqueNames.map(username =>
-            API.get(`/user/by-username/${username}`, { headers: { Authorization: `Bearer ${token}` } })
-              .then(res => res.data)
-              .catch(() => null)
-          )
-        );
-        const nameMap = {};
-        usersRes.forEach(user => {
-          if (user) nameMap[user.username] = user.username;
+      // Fetch dealer usernames for each batch
+      const dealerRes = await Promise.all(
+        batchIds.map(batchId =>
+          API.get(`/dealer-for-batch/${batchId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+            .then(res => res.data.dealer_username)
+            .catch(() => null)
+        )
+      );
+      // Map batchId -> dealer_username
+      const batchIdToDealerUsername = {};
+      batchIds.forEach((batchId, idx) => {
+        if (dealerRes[idx]) {
+          batchIdToDealerUsername[batchId] = dealerRes[idx];
+        }
+      });
+
+      // Fetch dealer user info for each unique dealer_username
+      const uniqueDealerUsernames = [...new Set(Object.values(batchIdToDealerUsername).filter(Boolean))];
+      const usersRes = await Promise.all(
+        uniqueDealerUsernames.map(username =>
+          API.get(`/user/by-username/${username}`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(res => res.data)
+            .catch(() => null)
+        )
+      );
+      const nameMap = {};
+      usersRes.forEach(user => {
+        if (user) nameMap[user.username] = user.username;
+      });
+      setDealerNames(nameMap);
+
+      // Save mapping from batchId to dealer_username for rendering
+      setBatchDetails(prev => {
+        const updated = { ...prev };
+        Object.entries(batchIdToDealerUsername).forEach(([batchId, dealerUsername]) => {
+          if (!updated[batchId]) updated[batchId] = {};
+          updated[batchId].dealer_username = dealerUsername;
         });
-        setDealerNames(nameMap);
-      }
+        return updated;
+      });
+
+      // Fetch mine info for each batch
+      const mineIds = batchRes
+        .filter(batch => batch && batch.mine_id)
+        .map(batch => batch.mine_id);
+      const uniqueMineIds = [...new Set(mineIds)];
+      const minesRes = await Promise.all(
+        uniqueMineIds.map(id =>
+          API.get(`/mines/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(res => res.data)
+            .catch(() => null)
+        )
+      );
+      const mineMap = {};
+      minesRes.forEach(mine => {
+        if (mine) mineMap[mine.id] = mine.name;
+      });
+      setBatchDetails(prev => {
+        const updated = { ...prev };
+        Object.values(updated).forEach(batch => {
+          if (batch && batch.mine_id && mineMap[batch.mine_id]) {
+            batch.mine_name = mineMap[batch.mine_id];
+          }
+        });
+        return updated;
+      });
+      setDealerNamesLoading(false);
     }
     fetchGoldbodDetails();
   }, [goldbodInvites]);
@@ -186,13 +243,19 @@ function DashboardPage() {
     await API.patch(`/goldbod-invitations/${inviteId}/accept`, {}, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    // Optionally, navigate to intake/log page for this batch
-    navigate(`/batch/${batchId}`);
+    // Refresh invites
+    const resp = await API.get("/goldbod-invitations", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setGoldbodInvites(resp.data || []);
+    setJustAcceptedGoldbodBatchId(batchId);
+    setShowGoldbodAcceptedNotification(true);
+    // Do NOT navigate automatically!
   };
   const handleRejectGoldbodInvite = async (inviteId) => {
     if (!window.confirm("Reject this invitation?")) return;
     const token = localStorage.getItem("token");
-    await API.patch(`/goldbod-invitations/${inviteId}/reject`, {}, {
+    await API.delete(`/goldbod-invitations/${inviteId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     // Refresh invites
@@ -273,6 +336,32 @@ function DashboardPage() {
                 className="btn-close ms-2"
                 aria-label="Close"
                 onClick={() => setShowAcceptedNotification(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ===== GOLDBOD ACCEPTED NOTIFICATION ===== */}
+        {showGoldbodAcceptedNotification && justAcceptedGoldbodBatchId && (
+          <div className="alert alert-success alert-dismissible fade show d-flex align-items-center justify-content-between" role="alert">
+            <div>
+              <b>Batch accepted!</b> The batch has been added to your trace history.
+            </div>
+            <div>
+              <button
+                className="btn btn-sm btn-outline-primary ms-2"
+                onClick={() => {
+                  setShowGoldbodAcceptedNotification(false);
+                  navigate('/trace-history');
+                }}
+              >
+                View Trace History
+              </button>
+              <button
+                type="button"
+                className="btn-close ms-2"
+                aria-label="Close"
+                onClick={() => setShowGoldbodAcceptedNotification(false)}
               />
             </div>
           </div>
@@ -400,122 +489,126 @@ function DashboardPage() {
             {goldbodInvites.filter(invite => invite.accepted == null).length === 0 ? (
               <div className="text-center text-muted py-2">Empty</div>
             ) : (
-              <ul className="list-unstyled">
-                {goldbodInvites
-                  .filter(invite => invite.accepted == null)
-                  .map(invite => {
-                    const batch = batchDetails[invite.batch_id];
-                    // Try to get dealer username from batch or invite
-                    const dealerName =
-                      (batch && batch.dealer_username) ||
-                      dealerNames[invite.dealer_username] ||
-                      invite.dealer_username ||
-                      "Unknown Dealer";
-                    return (
-                      <li key={invite.id} className="mb-2 border-bottom pb-2">
-                        <div
-                          className="d-flex align-items-center justify-content-between"
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => setExpandedInvite(expandedInvite === invite.id ? null : invite.id)}
-                        >
-                          <span>
-                            <b>From:</b> {dealerName}
-                          </span>
-                          <span>
-                            {expandedInvite === invite.id ? <FaChevronUp /> : <FaChevronDown />}
-                          </span>
-                        </div>
-                        {expandedInvite === invite.id && batch && (
-                          <div className="mt-2">
-                            <table className="table table-bordered table-sm mb-2">
-                              <thead>
-                                <tr>
-                                  <th>Batch ID</th>
-                                  <th>Mine Name</th>
-                                  <th>Date Registered</th>
-                                  <th>Weight (kg)</th>
-                                  <th>Purity (%)</th>
-                                  <th>Origin Cert</th>
-                                  <th>Dealer License</th>
-                                  <th>Assay Report</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td>{batch.batch_id}</td>
-                                  <td>{batch.mine_name || batch.mine_id}</td>
-                                  <td>
-                                    {batch.created_at
-                                      ? new Date(batch.created_at).toLocaleString()
-                                      : '—'}
-                                  </td>
-                                  <td>{batch.weight_kg}</td>
-                                  <td>{batch.purity_percent ?? '—'}</td>
-                                  <td>
-                                    {batch.origin_cert_image_url ? (
-                                      <a
-                                        href={batch.origin_cert_image_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="btn btn-sm btn-outline-info"
-                                      >
-                                        View
-                                      </a>
-                                    ) : (
-                                      'N/A'
-                                    )}
-                                  </td>
-                                  <td>
-                                    {batch.dealer_license_image_url ? (
-                                      <a
-                                        href={batch.dealer_license_image_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="btn btn-sm btn-outline-info"
-                                      >
-                                        View
-                                      </a>
-                                    ) : (
-                                      'N/A'
-                                    )}
-                                  </td>
-                                  <td>
-                                    {batch.assay_report_pdf_url ? (
-                                      <a
-                                        href={batch.assay_report_pdf_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="btn btn-sm btn-outline-info"
-                                      >
-                                        View
-                                      </a>
-                                    ) : (
-                                      'N/A'
-                                    )}
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                            <div className="d-flex gap-2">
-                              <button
-                                className="btn btn-success btn-sm"
-                                onClick={() => handleAcceptGoldbodInvite(invite.id, invite.batch_id)}
-                              >
-                                Accept
-                              </button>
-                              <button
-                                className="btn btn-danger btn-sm"
-                                onClick={() => handleRejectGoldbodInvite(invite.id)}
-                              >
-                                Reject
-                              </button>
+              <div>
+                {dealerNamesLoading ? (
+                  <div className="text-center text-muted py-2">Loading dealer info…</div>
+                ) : (
+                  <ul className="list-unstyled">
+                    {goldbodInvites
+                      .filter(invite => invite.accepted == null)
+                      .map(invite => {
+                        const batch = batchDetails[invite.batch_id];
+                        const dealerName =
+                          (batch && batch.dealer_username && dealerNames[batch.dealer_username]) ||
+                          (batch && batch.dealer_username) ||
+                          "Unknown Dealer";
+                        return (
+                          <li key={invite.id} className="mb-2 border-bottom pb-2">
+                            <div
+                              className="d-flex align-items-center justify-content-between"
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => setExpandedInvite(expandedInvite === invite.id ? null : invite.id)}
+                            >
+                              <span>
+                                <b>From:</b> {dealerName}
+                              </span>
+                              <span>
+                                {expandedInvite === invite.id ? <FaChevronUp /> : <FaChevronDown />}
+                              </span>
                             </div>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-              </ul>
+                            {expandedInvite === invite.id && batch && (
+                              <div className="mt-2">
+                                <table className="table table-bordered table-sm mb-2">
+                                  <thead>
+                                    <tr>
+                                      <th>Batch ID</th>
+                                      <th>Mine Name</th>
+                                      <th>Date Registered</th>
+                                      <th>Weight (kg)</th>
+                                      <th>Purity (%)</th>
+                                      <th>Origin Cert</th>
+                                      <th>Dealer License</th>
+                                      <th>Assay Report</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr>
+                                      <td>{batch.batch_id}</td>
+                                      <td>{batch.mine_name || batch.mine_id}</td>
+                                      <td>
+                                        {batch.created_at
+                                          ? new Date(batch.created_at).toLocaleString()
+                                          : '—'}
+                                      </td>
+                                      <td>{batch.weight_kg}</td>
+                                      <td>{batch.purity_percent ?? '—'}</td>
+                                      <td>
+                                        {batch.origin_cert_image_url ? (
+                                          <a
+                                            href={batch.origin_cert_image_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn btn-sm btn-outline-info"
+                                          >
+                                            View
+                                          </a>
+                                        ) : (
+                                          'N/A'
+                                        )}
+                                      </td>
+                                      <td>
+                                        {batch.dealer_license_image_url ? (
+                                          <a
+                                            href={batch.dealer_license_image_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn btn-sm btn-outline-info"
+                                          >
+                                            View
+                                          </a>
+                                        ) : (
+                                          'N/A'
+                                        )}
+                                      </td>
+                                      <td>
+                                        {batch.assay_report_pdf_url ? (
+                                          <a
+                                            href={batch.assay_report_pdf_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn btn-sm btn-outline-info"
+                                          >
+                                            View
+                                          </a>
+                                        ) : (
+                                          'N/A'
+                                        )}
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                                <div className="d-flex gap-2">
+                                  <button
+                                    className="btn btn-success btn-sm"
+                                    onClick={() => handleAcceptGoldbodInvite(invite.id, invite.batch_id)}
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    className="btn btn-danger btn-sm"
+                                    onClick={() => handleRejectGoldbodInvite(invite.id)}
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -586,7 +679,12 @@ function DashboardPage() {
                     <p className="card-text text-secondary mb-4">
                       Add new gold batch details for traceability.
                     </p>
-                    <button className="btn btn-warning px-4" style={{ fontWeight: 500 }}>
+                    <button
+                      type="button"
+                      className="btn btn-warning px-4"
+                      style={{ fontWeight: 500 }}
+                      onClick={e => { e.stopPropagation(); goToRegister(); }}
+                    >
                       Add Batch
                     </button>
                   </div>

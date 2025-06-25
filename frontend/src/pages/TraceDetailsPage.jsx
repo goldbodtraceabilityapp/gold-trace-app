@@ -76,6 +76,9 @@ function TraceDetailsPage() {
   const [inviteGoldbodUsername, setInviteGoldbodUsername] = useState("");
   const [inviteGoldbodMessage, setInviteGoldbodMessage] = useState("");
 
+  // Submitting state
+  const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -190,6 +193,7 @@ function TraceDetailsPage() {
   };
   const submitAsm = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     setAsmError("");
     setAsmSuccess("");
     try {
@@ -209,6 +213,7 @@ function TraceDetailsPage() {
         !asm_weight_kg
       ) {
         setAsmError("All ASM fields are required.");
+        setSubmitting(false);
         return;
       }
       const formData = new FormData();
@@ -241,6 +246,7 @@ function TraceDetailsPage() {
       const msg = err.response?.data?.error || "Error saving ASM registration.";
       setAsmError(msg);
     }
+    setSubmitting(false);
   };
 
   // Dealer Received Handlers
@@ -253,6 +259,7 @@ function TraceDetailsPage() {
   };
   const submitDealer = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     setDealerError("");
     setDealerSuccess("");
     try {
@@ -265,6 +272,7 @@ function TraceDetailsPage() {
         !dealer_receipt_id.trim()
       ) {
         setDealerError("All dealer fields are required.");
+        setSubmitting(false);
         return;
       }
       const formData = new FormData();
@@ -298,6 +306,7 @@ function TraceDetailsPage() {
       const msg = err.response?.data?.error || "Error saving dealer info.";
       setDealerError(msg);
     }
+    setSubmitting(false);
   };
 
   // Transport Handlers
@@ -307,6 +316,7 @@ function TraceDetailsPage() {
   };
   const submitTransport = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     setTransportError("");
     setTransportSuccess("");
     try {
@@ -324,6 +334,7 @@ function TraceDetailsPage() {
         !transport_destination_location.trim()
       ) {
         setTransportError("All transport fields are required.");
+        setSubmitting(false);
         return;
       }
       await API.patch(
@@ -349,6 +360,7 @@ function TraceDetailsPage() {
       const msg = err.response?.data?.error || "Error saving transport info.";
       setTransportError(msg);
     }
+    setSubmitting(false);
   };
 
   // Intake Handlers
@@ -358,6 +370,7 @@ function TraceDetailsPage() {
   };
   const submitIntake = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     setIntakeError("");
     setIntakeSuccess("");
     try {
@@ -373,6 +386,7 @@ function TraceDetailsPage() {
         !goldbod_intake_receipt_id.trim()
       ) {
         setIntakeError("All intake fields are required.");
+        setSubmitting(false);
         return;
       }
       await API.patch(
@@ -397,6 +411,7 @@ function TraceDetailsPage() {
       const msg = err.response?.data?.error || "Error saving intake info.";
       setIntakeError(msg);
     }
+    setSubmitting(false);
   };
 
   // Assay Handlers
@@ -405,10 +420,12 @@ function TraceDetailsPage() {
   };
   const submitAssay = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     setAssayError("");
     setAssaySuccess("");
     if (!purity.trim() || !assayFile) {
       setAssayError("Please provide both purity % and the assay PDF.");
+      setSubmitting(false);
       return;
     }
     try {
@@ -435,12 +452,14 @@ function TraceDetailsPage() {
         err.response?.data?.error || "Error uploading assay report."
       );
     }
+    setSubmitting(false);
   };
 
   // Invite Dealer Handler
   const handleInviteDealer = async (e) => {
     e.preventDefault();
     setInviteDealerMessage("");
+    setSubmitting(true);
     try {
       const token = localStorage.getItem("token");
       await API.post(
@@ -455,12 +474,14 @@ function TraceDetailsPage() {
         err.response?.data?.error || "Failed to send invite."
       );
     }
+    setSubmitting(false);
   };
 
   // Invite Goldbod Handler
   const handleInviteGoldbod = async (e) => {
     e.preventDefault();
     setInviteGoldbodMessage("");
+    setSubmitting(true);
     try {
       const token = localStorage.getItem("token");
       await API.post(
@@ -475,6 +496,7 @@ function TraceDetailsPage() {
         err.response?.data?.error || "Failed to send invite."
       );
     }
+    setSubmitting(false);
   };
 
   // Small helper to render a green circular checkmark
@@ -607,6 +629,7 @@ function TraceDetailsPage() {
                       <button
                         className="btn btn-sm btn-warning"
                         onClick={() => setShowAsmForm(true)}
+                        disabled={submitting}
                       >
                         Update
                       </button>
@@ -723,10 +746,11 @@ function TraceDetailsPage() {
                             type="button"
                             className="btn btn-outline-secondary"
                             onClick={() => setShowAsmForm(false)}
+                            disabled={submitting}
                           >
                             Close
                           </button>
-                          <button type="submit" className="btn btn-success">
+                          <button type="submit" className="btn btn-success" disabled={submitting}>
                             Save ASM Registration
                           </button>
                         </div>
@@ -807,6 +831,7 @@ function TraceDetailsPage() {
                           <button
                             className="btn btn-sm btn-warning"
                             onClick={() => setShowDealerForm(true)}
+                            disabled={submitting}
                           >
                             Update
                           </button>
@@ -901,10 +926,11 @@ function TraceDetailsPage() {
                                 type="button"
                                 className="btn btn-outline-secondary"
                                 onClick={() => setShowDealerForm(false)}
+                                disabled={submitting}
                               >
                                 Close
                               </button>
-                              <button type="submit" className="btn btn-success">
+                              <button type="submit" className="btn btn-success" disabled={submitting}>
                                 Submit Dealer Info
                               </button>
                             </div>
@@ -916,6 +942,7 @@ function TraceDetailsPage() {
                         <button
                           className="btn btn-outline-primary"
                           onClick={() => setShowInviteDealer(true)}
+                          disabled={submitting}
                         >
                           Invite Dealer
                         </button>
@@ -930,10 +957,12 @@ function TraceDetailsPage() {
                                 setInviteDealerUsername(e.target.value)
                               }
                               required
+                              disabled={submitting}
                             />
                             <button
                               type="submit"
                               className="btn btn-success btn-sm"
+                              disabled={submitting}
                             >
                               Send Invite
                             </button>
@@ -941,6 +970,7 @@ function TraceDetailsPage() {
                               type="button"
                               className="btn btn-secondary btn-sm ms-2"
                               onClick={() => setShowInviteDealer(false)}
+                              disabled={submitting}
                             >
                               Cancel
                             </button>
@@ -1005,6 +1035,7 @@ function TraceDetailsPage() {
                         <button
                           className="btn btn-sm btn-warning"
                           onClick={() => setShowTransportForm(true)}
+                          disabled={submitting}
                         >
                           Update
                         </button>
@@ -1099,10 +1130,11 @@ function TraceDetailsPage() {
                               type="button"
                               className="btn btn-outline-secondary"
                               onClick={() => setShowTransportForm(false)}
+                              disabled={submitting}
                             >
                               Close
                             </button>
-                            <button type="submit" className="btn btn-primary">
+                            <button type="submit" className="btn btn-primary" disabled={submitting}>
                               Submit Transport
                             </button>
                           </div>
@@ -1116,6 +1148,7 @@ function TraceDetailsPage() {
                         <button
                           className="btn btn-sm btn-warning"
                           onClick={() => setShowTransportForm(true)}
+                          disabled={submitting}
                         >
                           Update
                         </button>
@@ -1210,10 +1243,11 @@ function TraceDetailsPage() {
                               type="button"
                               className="btn btn-outline-secondary"
                               onClick={() => setShowTransportForm(false)}
+                              disabled={submitting}
                             >
                               Close
                             </button>
-                            <button type="submit" className="btn btn-primary">
+                            <button type="submit" className="btn btn-primary" disabled={submitting}>
                               Submit Transport
                             </button>
                           </div>
@@ -1222,12 +1256,6 @@ function TraceDetailsPage() {
                   </div>
                 )}
               </li>
-
-
-            
-
-
-
 
               {/* 4) Goldbod Intake & Weighing */}
               <li className="list-group-item">
@@ -1279,6 +1307,7 @@ function TraceDetailsPage() {
                       <button
                         className="btn btn-sm btn-warning"
                         onClick={() => setShowIntakeForm(true)}
+                        disabled={submitting}
                       >
                         Update
                       </button>
@@ -1354,10 +1383,11 @@ function TraceDetailsPage() {
                             type="button"
                             className="btn btn-outline-secondary"
                             onClick={() => setShowIntakeForm(false)}
+                            disabled={submitting}
                           >
                             Close
                           </button>
-                          <button type="submit" className="btn btn-success">
+                          <button type="submit" className="btn btn-success" disabled={submitting}>
                             Submit Intake
                           </button>
                         </div>
@@ -1368,58 +1398,45 @@ function TraceDetailsPage() {
 
 
                 {/* Dealer can invite Goldbod after intake is still pending */}
-{!goldbod_intake_at && transport_shipped_at && user?.role === "dealer" && (
-  <div className="mt-3">
-    <button
-      className="btn btn-outline-primary"
-      onClick={() => setShowInviteGoldbod(true)}
-    >
-      Invite Goldbod
-    </button>
-    {showInviteGoldbod && (
-      <form onSubmit={handleInviteGoldbod} className="mt-2">
-        <input
-          type="text"
-          className="form-control mb-2"
-          placeholder="Enter goldbod's username"
-          value={inviteGoldbodUsername}
-          onChange={e => setInviteGoldbodUsername(e.target.value)}
-          required
-        />
-        <button type="submit" className="btn btn-success btn-sm">
-          Send Invite
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm ms-2"
-          onClick={() => setShowInviteGoldbod(false)}
-        >
-          Cancel
-        </button>
-      </form>
-    )}
-    {inviteGoldbodMessage && (
-      <div className="alert alert-info mt-2">{inviteGoldbodMessage}</div>
-    )}
-  </div>
-)}
-
-
-
-
-
+                {!goldbod_intake_at && transport_shipped_at && user?.role === "dealer" && (
+                  <div className="mt-3">
+                    <button
+                      className="btn btn-outline-primary"
+                      onClick={() => setShowInviteGoldbod(true)}
+                      disabled={submitting}
+                    >
+                      Invite Goldbod
+                    </button>
+                    {showInviteGoldbod && (
+                      <form onSubmit={handleInviteGoldbod} className="mt-2">
+                        <input
+                          type="text"
+                          className="form-control mb-2"
+                          placeholder="Enter goldbod's username"
+                          value={inviteGoldbodUsername}
+                          onChange={e => setInviteGoldbodUsername(e.target.value)}
+                          required
+                          disabled={submitting}
+                        />
+                        <button type="submit" className="btn btn-success btn-sm" disabled={submitting}>
+                          Send Invite
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm ms-2"
+                          onClick={() => setShowInviteGoldbod(false)}
+                          disabled={submitting}
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    )}
+                    {inviteGoldbodMessage && (
+                      <div className="alert alert-info mt-2">{inviteGoldbodMessage}</div>
+                    )}
+                  </div>
+                )}
               </li>
-
-
-
-               
-
-
-
-
-
-
-
 
               {/* 5) Goldbod Assay Completed */}
               <li className="list-group-item">
@@ -1473,60 +1490,70 @@ function TraceDetailsPage() {
                         Assay Report: N/A
                       </p>
 
-                      {/* Only Goldbod can update */}
-                      {user?.role === "goldbod" &&
-                        (!showAssayForm ? (
-                          <button
-                            className="btn btn-sm btn-warning"
-                            onClick={() => setShowAssayForm(true)}
-                          >
-                            Update
-                          </button>
-                        ) : (
-                          <form onSubmit={submitAssay} className="row g-2 mt-2">
-                            <div className="col-md-6">
-                              <label
-                                htmlFor="purity"
-                                className="form-label fw-semibold"
-                              >
-                                Purity (%)
-                              </label>
-                              <input
-                                type="number"
-                                id="purity"
-                                name="purity"
-                                className="form-control"
-                                placeholder="e.g., 98.7"
-                                value={purity}
-                                onChange={(e) => setPurity(e.target.value)}
-                              />
-                            </div>
-
-                            {assayError && (
-                              <div className="alert alert-danger text-center">
-                                {assayError}
+                      {/* Only Goldbod can update, and ONLY after intake is done */}
+                      {user?.role === "goldbod" && !assay_completed_at && goldbod_intake_at && (
+                        <>
+                          {!showAssayForm ? (
+                            <button
+                              className="btn btn-sm btn-warning"
+                              onClick={() => setShowAssayForm(true)}
+                              disabled={submitting}
+                            >
+                              Update
+                            </button>
+                          ) : (
+                            <form onSubmit={submitAssay} className="row g-2 mt-2">
+                              <div className="col-md-6">
+                                <label htmlFor="purity" className="form-label fw-semibold">
+                                  Purity (%)
+                                </label>
+                                <input
+                                  type="number"
+                                  id="purity"
+                                  name="purity"
+                                  className="form-control"
+                                  placeholder="e.g., 98.7"
+                                  value={purity}
+                                  onChange={(e) => setPurity(e.target.value)}
+                                  required
+                                />
                               </div>
-                            )}
-                            {assaySuccess && (
-                              <div className="alert alert-success text-center">
-                                {assaySuccess}
+                              <div className="col-md-6">
+                                <label htmlFor="assayFile" className="form-label fw-semibold">
+                                  Assay Report (PDF)
+                                </label>
+                                <input
+                                  type="file"
+                                  id="assayFile"
+                                  accept="application/pdf"
+                                  className="form-control"
+                                  onChange={handleAssayFileChange}
+                                  required
+                                />
                               </div>
-                            )}
-
-                            <div className="col-12 d-flex justify-content-end gap-2 mt-2">
-                              <button
-                                type="button"
-                                className="btn btn-outline-secondary"
-                                onClick={() => setShowAssayForm(false)}
-                              >
-                                Close
-                              </button>
-                              <button type="submit" className="btn btn-success">
-                                Submit Assay
-                              </button>
-                            </div>
-                          </form>
-                        ))}
+                              {assayError && (
+                                <div className="alert alert-danger text-center">{assayError}</div>
+                              )}
+                              {assaySuccess && (
+                                <div className="alert alert-success text-center">{assaySuccess}</div>
+                              )}
+                              <div className="col-12 d-flex justify-content-end gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-secondary"
+                                  onClick={() => setShowAssayForm(false)}
+                                  disabled={submitting}
+                                >
+                                  Close
+                                </button>
+                                <button type="submit" className="btn btn-success" disabled={submitting}>
+                                  Submit Assay
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1535,6 +1562,29 @@ function TraceDetailsPage() {
           </div>
         </div>
       </div>
+
+      {/* Submitting overlay */}
+      {submitting && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(255,255,255,0.7)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div className="text-center">
+            <div className="spinner-border text-warning mb-3" role="status" />
+            <div style={{ fontSize: "1.3rem", color: "#b99651" }}>Loading…</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -84,11 +84,29 @@ app.get("/batches", authenticate, async (req, res) => {
   try {
     let batches = [];
     if (req.user.role === "dealer") {
-      // Get batches where this dealer has accepted the invite
+      // Dealer: batches where this dealer has accepted the invite
       const { data: invites, error: invitesError } = await supabase
         .from("dealer_invitations")
         .select("batch_id")
         .eq("dealer_username", req.user.username)
+        .eq("accepted", true);
+
+      if (invitesError) return res.status(500).json({ error: invitesError.message });
+      const batchIds = invites.map(inv => inv.batch_id);
+
+      if (batchIds.length === 0) return res.json([]);
+      const { data, error } = await supabase
+        .from("batches")
+        .select("*")
+        .in("id", batchIds);
+      if (error) return res.status(500).json({ error: error.message });
+      batches = data;
+    } else if (req.user.role === "goldbod") {
+      // Goldbod: batches where this goldbod has accepted the invite
+      const { data: invites, error: invitesError } = await supabase
+        .from("goldbod_invitations")
+        .select("batch_id")
+        .eq("goldbod_username", req.user.username)
         .eq("accepted", true);
 
       if (invitesError) return res.status(500).json({ error: invitesError.message });
@@ -119,28 +137,14 @@ app.get("/batches", authenticate, async (req, res) => {
 
 // GET /batches/:id (get a single batch by its primary key)
 app.get("/batches/:id", authenticate, async (req, res) => {
-  try {
-    const batchId = req.params.id;
-    const { data: batch, error } = await supabase
-      .from("batches")
-      .select("*, mines(name)")
-      .eq("id", batchId)
-      .single();
-
-    if (error || !batch) {
-      return res.status(404).json({ error: "Batch not found." });
-    }
-    if (batch.user_id !== req.user.id && req.user.role !== 'dealer') {
-      return res.status(403).json({ error: "Not authorized to view this batch." });
-    }
-    // Attach mine_name for frontend
-    batch.mine_name = batch.mines?.name || batch.mine_id;
-    delete batch.mines;
-    res.json(batch);
-  } catch (err) {
-    console.error("GET /batches/:id error:", err);
-    res.status(500).json({ error: "Server error fetching batch." });
-  }
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from('batches')
+    .select('*')
+    .eq('id', id) // <--- must be 'id', not 'batch_id'
+    .single();
+  if (error || !data) return res.status(404).json({ error: 'Batch not found' });
+  res.json(data);
 });
 
 // GET /mines (role‐aware: returns only mines the user owns, unless they’re “goldbod”)
@@ -761,11 +765,23 @@ app.post("/batches/:id/invite-goldbod", authenticate, async (req, res) => {
     return res.status(404).json({ error: "Batch not found." });
   }
 
-  // Check if invitation already exists
+  // Check if the goldbod user exists
+  const { data: goldbodUser, error: goldbodUserError } = await supabase
+    .from("users")
+    .select("username")
+    .eq("username", goldbod_username)
+    .eq("role", "goldbod")
+    .single();
+  if (goldbodUserError || !goldbodUser) {
+    return res.status(404).json({ error: "User does not exist." });
+  }
+
+  // Check if a pending invitation already exists
   const { data: existingInvite } = await supabase
     .from("goldbod_invitations")
     .select("*")
     .eq("batch_id", batchId)
+    .eq("goldbod_username", goldbod_username)
     .single();
   if (existingInvite) {
     return res.status(400).json({ error: "Goldbod already invited for this batch." });
@@ -779,7 +795,6 @@ app.post("/batches/:id/invite-goldbod", authenticate, async (req, res) => {
         batch_id: batchId,
         invited_by: req.user.id,
         goldbod_username,
-        // accepted: null (pending)
       },
     ])
     .select()
@@ -911,24 +926,17 @@ app.patch("/goldbod-invitations/:id/accept", authenticate, async (req, res) => {
   res.json(data);
 });
 
-app.patch("/goldbod-invitations/:id/reject", authenticate, async (req, res) => {
-  const { id } = req.params;
-  // Only the invited goldbod can reject
-  const { data: invite, error } = await supabase
-    .from("goldbod_invitations")
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (error || !invite) return res.status(404).json({ error: "Invite not found" });
-  if (invite.goldbod_username !== req.user.username) return res.status(403).json({ error: "Not your invite" });
 
-  const { data, error: updateError } = await supabase
-    .from("goldbod_invitations")
-    .update({ accepted: false })
-    .eq("id", id)
-    .select()
+// GET /dealer-for-batch/:batchId
+app.get('/dealer-for-batch/:batchId', authenticate, async (req, res) => {
+  const { batchId } = req.params;
+  const { data, error } = await supabase
+    .from('dealer_invitations')
+    .select('dealer_username')
+    .eq('batch_id', batchId)
+    .eq('accepted', true)
     .single();
-  if (updateError) return res.status(400).json({ error: updateError.message });
+  if (error || !data) return res.status(404).json({ error: 'Dealer not found for this batch' });
   res.json(data);
 });
 
@@ -936,4 +944,35 @@ app.patch("/goldbod-invitations/:id/reject", authenticate, async (req, res) => {
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
+});
+
+app.get('/mines/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from('mines')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !data) return res.status(404).json({ error: 'Mine not found' });
+  res.json(data);
+});
+
+// DELETE /goldbod-invitations/:id
+app.delete('/goldbod-invitations/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  // Only the invited goldbod can delete their invite
+  const { data: invite, error } = await supabase
+    .from('goldbod_invitations')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.goldbod_username !== req.user.username) return res.status(403).json({ error: 'Not your invite' });
+
+  const { error: deleteError } = await supabase
+    .from('goldbod_invitations')
+    .delete()
+    .eq('id', id);
+  if (deleteError) return res.status(400).json({ error: deleteError.message });
+  res.json({ success: true });
 });
