@@ -940,11 +940,7 @@ app.get('/dealer-for-batch/:batchId', authenticate, async (req, res) => {
   res.json(data);
 });
 
-// 11. Start the server
-const PORT = 5000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-});
+
 
 app.get('/mines/:id', authenticate, async (req, res) => {
   const { id } = req.params;
@@ -975,4 +971,12 @@ app.delete('/goldbod-invitations/:id', authenticate, async (req, res) => {
     .eq('id', id);
   if (deleteError) return res.status(400).json({ error: deleteError.message });
   res.json({ success: true });
+});
+
+
+
+// 11. Start the server
+const PORT = 5000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
 });
