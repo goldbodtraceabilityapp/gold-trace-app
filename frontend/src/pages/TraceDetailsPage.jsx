@@ -746,7 +746,7 @@ function TraceDetailsPage() {
                             type="button"
                             className="btn btn-outline-secondary"
                             onClick={() => setShowAsmForm(false)}
-                            disabled={submitting}
+                           
                           >
                             Close
                           </button>
@@ -823,8 +823,7 @@ function TraceDetailsPage() {
                   </p>
                 </div>
                 {/* Update button, form, and invite logic */}
-                {!dealer_received_at && user && (
-                  <>
+                {!dealer_received_at && user && !transport_shipped_at && (                <>
                     {user.role === "dealer" ? (
                       <div className="mt-3">
                         {!showDealerForm ? (
@@ -917,7 +916,7 @@ function TraceDetailsPage() {
                                 id="dealer_license"
                                 name="dealer_license"
                                 className="form-control"
-                                accept="image/*,application/pdf"
+                                accept
                                 onChange={handleDealerLicenseChange}
                               />
                             </div>
