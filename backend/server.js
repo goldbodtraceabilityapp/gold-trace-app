@@ -56,11 +56,35 @@ app.post("/auth/login", async (req, res) => {
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.status(401).json({ error: "Invalid password" });
 
-  // Include role in the JWT payload!
+  // Access token: short-lived (e.g. 15m)
   const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: "10s",
+    expiresIn: "15m",
   });
-  res.json({ token });
+
+  // Refresh token: long-lived (e.g. 7d)
+  const refreshToken = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+
+  res.json({ token, refreshToken });
+});
+
+app.post("/auth/refresh", async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(401).json({ error: "Missing refresh token" });
+
+  try {
+    const payload = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    // Issue new access token
+    const token = jwt.sign(
+      { id: payload.id, role: payload.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+    res.json({ token });
+  } catch {
+    res.status(401).json({ error: "Invalid refresh token" });
+  }
 });
 
 // 8. Protected Routes

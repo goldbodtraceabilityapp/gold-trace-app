@@ -40,6 +40,7 @@ function DashboardPage() {
         }
       } catch {
         localStorage.removeItem("token");
+        localStorage.removeItem('refreshToken');
         navigate("/");
       }
     };
@@ -243,6 +244,7 @@ function DashboardPage() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem('refreshToken');
     navigate("/");
   };
 
