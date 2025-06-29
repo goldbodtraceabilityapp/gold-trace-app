@@ -518,6 +518,10 @@ function TraceDetailsPage() {
         padding: "2rem 0",
         margin: 0,
         overflowX: "hidden",
+        backgroundImage: 'url("/Goldbodlogoforhome-1.jpg")', // <-- add this line
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'center',
+    backgroundSize: 'cover',
       }}
     >
       <div className="container-fluid px-4">

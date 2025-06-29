@@ -76,7 +76,11 @@ function TraceHistoryPage() {
         width: '100vw',
         padding: '2rem 0',
         margin: 0,
-        overflowX: 'hidden'
+        overflowX: 'hidden',
+        backgroundImage: 'url("/Goldbodlogoforhome-1.jpg")', // <-- add this line
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'center',
+    backgroundSize: 'cover',
       }}
     >
       <div className="container-fluid px-4">
@@ -99,7 +103,7 @@ function TraceHistoryPage() {
             Trace History
           </h1>
           <button
-            className="btn btn-secondary"
+            className="btn btn-secondary "
             style={{
               color: '#fff',
               fontWeight: 500,
@@ -136,8 +140,9 @@ function TraceHistoryPage() {
           className="table-responsive shadow-sm"
           style={{
             borderRadius: '0.75rem',
-            overflow: 'hidden',
-            background: 'rgba(255,255,255,0.97)'
+            background: 'rgba(255,255,255,0.97)',
+            maxHeight: '90vh',      // Add this line
+            overflowY: 'auto',      // Add this line
           }}
         >
           {loading ? (

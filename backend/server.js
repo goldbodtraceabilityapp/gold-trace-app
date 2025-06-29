@@ -58,7 +58,7 @@ app.post("/auth/login", async (req, res) => {
 
   // Include role in the JWT payload!
   const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: "10h",
+    expiresIn: "10s",
   });
   res.json({ token });
 });

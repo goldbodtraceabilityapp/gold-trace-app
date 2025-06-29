@@ -8,6 +8,7 @@ import RegisterBatchPage from "./pages/RegisterBatchPage";
 import TraceHistoryPage from "./pages/TraceHistoryPage";
 import TraceDetailsPage from "./pages/TraceDetailsPage";
 import MinesPage from "./pages/MinesPage";
+import BlockchainAnchorPage from "./pages/BlockchainAnchorPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useCurrentUser } from "./hooks/useCurrentUser";
@@ -16,7 +17,24 @@ function App() {
   const { user, loading } = useCurrentUser();
 
   // While we’re fetching “/user/me”, don’t render anything yet
-  if (loading) return <div>Loading…</div>;
+  if (loading)
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          width: "100vw",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(135deg, #f9d976 0%, #b99651 100%)",
+        }}
+      >
+        <div className="text-center">
+          <div className="spinner-border text-warning mb-3" role="status" />
+          <div style={{ fontSize: "2.3rem", color: "#fff" }}>Loading…</div>
+        </div>
+      </div>
+    );
 
   return (
     <Routes>
@@ -74,6 +92,16 @@ function App() {
         element={
           <ProtectedRoute>
             <MinesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Blockchain Anchor (protected) */}
+      <Route
+        path="/blockchain-anchor"
+        element={
+          <ProtectedRoute>
+            <BlockchainAnchorPage />
           </ProtectedRoute>
         }
       />

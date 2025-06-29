@@ -340,6 +340,10 @@ function DashboardPage() {
         padding: "2rem 0",
         margin: 0,
         overflowX: "hidden",
+        backgroundImage: 'url("/Goldbodlogoforhome-1.jpg")', // <-- add this line
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'center',
+    backgroundSize: 'cover',
       }}
     >
       <div className="container-fluid px-4">
@@ -910,9 +914,59 @@ function DashboardPage() {
                 </div>
               </div>
             )}
+
+            {/* ===== BLOCKCHAIN ANCHORING CARD (HIDDEN FOR NOW) ===== */}
+            { <div className="col-12 col-md-3">
+              <div
+                className="card h-100"
+                style={{
+                  border: "2px solid #fff",
+                  borderRadius: "0.75rem",
+                  backgroundColor: "rgba(255,255,255,0.9)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                  cursor: "pointer",                  
+                }}
+                onClick={() => navigate("/blockchain-anchor")}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-3px)";
+                  e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.12)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+                }}
+              >
+                <div className="card-body text-center py-5">
+                  <h5 className="card-title mb-3" style={{ color: "#b99651" }}>
+                    Blockchain Anchoring
+                  </h5>
+                  <p className="card-text text-secondary mb-4">
+                    Tamper-proof batch verification on Polygon blockchain.
+                  </p>
+                  <span
+                    className="badge bg-warning text-dark mb-3"
+                    style={{ fontSize: "1.1rem", padding: "0.7em 1.5em" }}
+                  >
+                    Coming Soon
+                  </span>
+                  <br />
+                  <button
+                    className="btn btn-outline-primary mt-2"
+                    style={{ fontWeight: 500 }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      navigate("/blockchain-anchor");
+                    }}
+                  >
+                    Learn More
+                  </button>
+                </div>
+              </div>
+            </div> }
           </div>
         ) : (
-          <p className="text-white text-center mt-5">Loading your info…</p>
+          <p className="text-white text-center mt-5"><h4>Loading your info…</h4></p>
         )}
 
         {/* ===== USER INFO ===== */}

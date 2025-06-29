@@ -30,7 +30,15 @@ function LoginPage() {
   return (
     <div
       className="d-flex justify-content-center align-items-center"
-      style={{ minHeight: '100vh', width: '100vw' }}
+      style={{
+        minHeight: '100vh',
+        width: '100vw',
+        background: 'linear-gradient(135deg, #f9d976 0%, #b99651 100%)',
+        backgroundImage: 'url("/Goldbodlogoforhome-1.jpg")',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        backgroundSize: 'cover',
+      }}
     >
       <div
         style={{
@@ -39,7 +47,8 @@ function LoginPage() {
           padding: '2rem',
           borderRadius: '8px',
           boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
-          background: '#fff',
+          background: 'rgba(255,255,255,0.75)',
+          backdropFilter: 'blur(4px)', 
         }}
       >
         <h2 className="mb-4 text-center">Login</h2>
