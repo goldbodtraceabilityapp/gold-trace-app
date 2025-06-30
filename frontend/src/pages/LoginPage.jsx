@@ -21,7 +21,7 @@ function LoginPage() {
     try {
       const res = await API.post('/auth/login', formData);
       localStorage.setItem('token', res.data.token);
-      localStorage.setItem('refreshToken', res.data.refreshToken);
+      //localStorage.setItem('refreshToken', res.data.refreshToken);
       window.location.href = '/dashboard';
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');

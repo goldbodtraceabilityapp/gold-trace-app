@@ -1,10 +1,9 @@
 const jwt = require("jsonwebtoken");
-const { createClient } = require("@supabase/supabase-js");
+const { Pool } = require("pg");
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
 module.exports = async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization || "";
@@ -13,13 +12,13 @@ module.exports = async function authenticate(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    // Fetch user id, username, and role from DB
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("id, username, role")
-      .eq("id", payload.id)
-      .single();
-    if (error || !user) return res.status(401).json({ error: "Invalid user" });
+    // Fetch user id, username, and role from DB using SQL
+    const result = await pool.query(
+      "SELECT id, username, role FROM users WHERE id = $1",
+      [payload.id]
+    );
+    const user = result.rows[0];
+    if (!user) return res.status(401).json({ error: "Invalid user" });
     req.user = { id: user.id, username: user.username, role: user.role };
     next();
   } catch {

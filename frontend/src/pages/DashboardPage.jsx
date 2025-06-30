@@ -471,7 +471,7 @@ function DashboardPage() {
                         }
                       >
                         <span>
-                          <b>From:</b> {inviterName}
+                          <b>From:</b> {invite.inviter_username || "Unknown"}
                         </span>
                         <span>
                           {expandedInvite === invite.id ? (
@@ -499,7 +499,7 @@ function DashboardPage() {
                             <tbody>
                               <tr>
                                 <td>{batch.batch_id}</td>
-                                <td>{batch.mine_name || batch.mine_id}</td>
+                                <td>{invite.mine_name || invite.batch_id}</td>
                                 <td>
                                   {batch.created_at
                                     ? new Date(
@@ -622,6 +622,8 @@ function DashboardPage() {
                               <span>
                                 <b>Invited By:</b>{" "}
                                 {inviterNames[invite.invited_by] || "Unknown"}
+                                <br />
+                                <b>Mine:</b> {(batch && batch.mine_name) || "Unknown"}
                               </span>
                               <span>
                                 {expandedInvite === invite.id ? (
