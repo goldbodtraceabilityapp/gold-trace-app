@@ -79,7 +79,7 @@ app.post("/auth/login", async (req, res) => {
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
       {
-        expiresIn: "20h",
+        expiresIn: "20s",
       }
     );
 
@@ -95,7 +95,7 @@ app.post("/auth/login", async (req, res) => {
     res
       .cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: true, // only over HTTPS
+        secure: false, // only over HTTPS
         sameSite: "strict",
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       })
@@ -116,7 +116,7 @@ app.post("/auth/refresh", async (req, res) => {
     const token = jwt.sign(
       { id: payload.id, role: payload.role },
       process.env.JWT_SECRET,
-      { expiresIn: "20h" }
+      { expiresIn: "20s" }
     );
     res.json({ token });
   } catch {

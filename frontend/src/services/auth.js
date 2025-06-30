@@ -11,8 +11,15 @@ export async function getValidToken() {
 
   if (exp < now + 60) {
     try {
-      const res = await API.post('/auth/refresh', {}, { withCredentials: true });
-      token = res.data.token;
+      // Use fetch directly to avoid circular import
+      const res = await fetch('http://localhost:5000/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error('Refresh failed');
+      const data = await res.json();
+      token = data.token;
       localStorage.setItem('token', token);
     } catch {
       localStorage.removeItem('token');
