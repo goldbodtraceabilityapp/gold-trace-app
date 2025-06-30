@@ -79,7 +79,7 @@ app.post("/auth/login", async (req, res) => {
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
       {
-        expiresIn: "20s",
+        expiresIn: "20h",
       }
     );
 
@@ -95,7 +95,7 @@ app.post("/auth/login", async (req, res) => {
     res
       .cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: false, // only over HTTPS
+        secure: true, // only over HTTPS
         sameSite: "strict",
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       })
@@ -116,7 +116,7 @@ app.post("/auth/refresh", async (req, res) => {
     const token = jwt.sign(
       { id: payload.id, role: payload.role },
       process.env.JWT_SECRET,
-      { expiresIn: "20s" }
+      { expiresIn: "20h" }
     );
     res.json({ token });
   } catch {
@@ -501,7 +501,6 @@ app.patch(
         dealer_location,
         parseFloat(dealer_received_weight),
         dealer_receipt_id,
-        batchId,
       ];
       let updateQuery = `
         UPDATE batches
@@ -515,6 +514,7 @@ app.patch(
         updateFields.push(dealer_license_image_url, batchId);
       } else {
         updateQuery += ` WHERE id = $5 RETURNING *`;
+        updateFields.push(batchId);
       }
 
       const updateResult = await pool.query(updateQuery, updateFields);
