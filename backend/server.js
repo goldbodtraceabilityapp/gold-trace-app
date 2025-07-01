@@ -41,9 +41,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // 6. Public Routes
-app.get("/", (req, res) => {
-  res.send("Welcome to the GOLDBOD GOLD TRACEABILITY APP!");
-});
 
 // 7. Authentication Routes
 app.post("/auth/register", async (req, res) => {
