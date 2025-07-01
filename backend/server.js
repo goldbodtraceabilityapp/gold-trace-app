@@ -1018,6 +1018,22 @@ app.delete("/goldbod-invitations/:id", authenticate, async (req, res) => {
   }
 });
 
+// GET /user/by-username/:username
+app.get("/user/by-username/:username", authenticate, async (req, res) => {
+  const { username } = req.params;
+  try {
+    const result = await pool.query(
+      "SELECT id, username FROM users WHERE username = $1",
+      [username]
+    );
+    const user = result.rows[0];
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Serve static frontend (after all API routes)
 const path = require("path");
 app.use(express.static(path.join(__dirname, "dist")));
