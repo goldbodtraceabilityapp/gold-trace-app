@@ -319,7 +319,7 @@ app.post(
       // 6️⃣ Upload origin certificate image to Supabase Storage
       const originFile = originFiles[0];
       const originPath = `origin-certs/${batch_id}-${originFile.originalname}`;
-      await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from("origin-certs")
         .upload(originPath, originFile.buffer, {
           contentType: originFile.mimetype,
