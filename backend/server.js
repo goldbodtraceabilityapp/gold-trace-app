@@ -762,6 +762,28 @@ app.post("/batches/:id/invite-goldbod", authenticate, async (req, res) => {
     return res.status(404).json({ error: "Batch not found." });
   }
 
+ // 🚩 Only allow ASM to invite goldbod if dealer has NOT updated the batch
+if (user.role === "asm" && batch.dealer_received_at) {
+  return res.status(403).json({
+    error: "ASM cannot invite goldbod after a dealer has updated this batch.",
+  });
+}
+
+// 🚩 Only allow dealer to invite goldbod if they are the invited/accepted dealer for this batch
+if (user.role === "dealer") {
+  // Check if this dealer is the accepted dealer for this batch
+  const dealerInviteResult = await pool.query(
+    "SELECT * FROM dealer_invitations WHERE batch_id = $1 AND dealer_username = $2 AND accepted = true",
+    [batchId, user.username]
+  );
+  const dealerInvite = dealerInviteResult.rows[0];
+  if (!dealerInvite) {
+    return res.status(403).json({
+      error: "Only the accepted dealer for this batch can invite goldbod.",
+    });
+  }
+}
+
   // Check if the goldbod user exists
   const goldbodUserResult = await pool.query(
     "SELECT username FROM users WHERE username = $1 AND role = $2",
