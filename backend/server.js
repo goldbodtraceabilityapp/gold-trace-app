@@ -35,8 +35,8 @@ app.use(express.json());
 app.use(cookieParser());
 
 const corsOptions = {
-  origin: "http://localhost:3000", // or your frontend port
-  credentials: true, // allow cookies
+  origin: process.env.NODE_ENV === "production" ? undefined : "http://localhost:3000",
+  credentials: true,
 };
 app.use(cors(corsOptions));
 
@@ -1016,6 +1016,13 @@ app.delete("/goldbod-invitations/:id", authenticate, async (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
+});
+
+// Serve static frontend (after all API routes)
+const path = require("path");
+app.use(express.static(path.join(__dirname, "dist")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 // 11. Start the server
