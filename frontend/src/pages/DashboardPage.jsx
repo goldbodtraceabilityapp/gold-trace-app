@@ -243,9 +243,8 @@ function DashboardPage() {
   }, [goldbodInvites]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem('refreshToken');
-    navigate("/");
+    localStorage.removeItem('token');
+    window.location.href = '/'; // <-- Force full reload to login page
   };
 
   const goToRegister = () => navigate("/register-batch");
@@ -365,7 +364,7 @@ function DashboardPage() {
               textAlign: "center",
             }}
           >
-            Gold Traceability Dashboard v99
+            Gold Traceability Dashboard
           </h1>
           <button
             className="btn btn-danger"
@@ -893,6 +892,7 @@ function DashboardPage() {
                       "0 6px 16px rgba(0,0,0,0.12)";
                   }}
                   onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow =
                       "0 4px 12px rgba(0,0,0,0.08)";
