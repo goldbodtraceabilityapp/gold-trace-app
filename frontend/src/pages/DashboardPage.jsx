@@ -365,7 +365,7 @@ function DashboardPage() {
               textAlign: "center",
             }}
           >
-            Gold Traceability Dashboard
+            Gold Traceability Dashboard v99
           </h1>
           <button
             className="btn btn-danger"
