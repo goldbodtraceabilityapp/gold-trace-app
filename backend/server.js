@@ -1031,6 +1031,12 @@ app.get("/user/by-username/:username", authenticate, async (req, res) => {
   }
 });
 
+// Basic health endpoint for uptime monitors (returns 200 OK)
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+
 // Serve static frontend (after all API routes)
 const path = require("path");
 app.use(express.static(path.join(__dirname, "dist")));
