@@ -17,6 +17,7 @@ const cookieParser = require("cookie-parser");
 // 3. Initialize PostgreSQL client
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
 // 3.5. Initialize Supabase client (for storage only)
@@ -92,7 +93,7 @@ app.post("/auth/login", async (req, res) => {
     res
       .cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: true, // only over HTTPS
+        secure: process.env.NODE_ENV === "production", // allow localhost in development
         sameSite: "strict",
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       })
